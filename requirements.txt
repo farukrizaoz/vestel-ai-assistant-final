@@ -1,0 +1,10 @@
+requests
+beautifulsoup4
+pdfplumber
+PyPDF2
+crewai
+crewai_tools
+langchain_google_genai
+python-dotenv
+google-generativeai
+

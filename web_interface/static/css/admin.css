@@ -1,0 +1,164 @@
+/* Admin Panel Styles */
+.stat-card {
+    transition: transform 0.2s ease;
+}
+
+.stat-card:hover {
+    transform: translateY(-2px);
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0,123,255,0.05);
+}
+
+.session-status {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 5px;
+}
+
+.session-status.active {
+    background-color: #28a745;
+    box-shadow: 0 0 4px rgba(40, 167, 69, 0.5);
+}
+
+.session-status.inactive {
+    background-color: #6c757d;
+}
+
+/* Modal Enhancements */
+.modal-body {
+    max-height: 70vh;
+    overflow-y: auto;
+}
+
+.chat-history-item {
+    padding: 8px 12px;
+    margin: 4px 0;
+    border-radius: 8px;
+    border-left: 3px solid transparent;
+}
+
+.chat-history-item.user {
+    background-color: #e3f2fd;
+    border-left-color: #2196f3;
+}
+
+.chat-history-item.assistant {
+    background-color: #f3e5f5;
+    border-left-color: #9c27b0;
+}
+
+.chat-timestamp {
+    font-size: 0.75rem;
+    color: #6c757d;
+    float: right;
+}
+
+/* Product List Styles */
+.product-item {
+    background: white;
+    border: 1px solid #e9ecef;
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin: 4px 0;
+    display: flex;
+    justify-content: between;
+    align-items: center;
+}
+
+.product-name {
+    font-weight: 500;
+    color: #007bff;
+    text-decoration: none;
+    font-size: 0.9rem;
+}
+
+.product-model {
+    font-size: 0.8rem;
+    color: #6c757d;
+    font-family: monospace;
+}
+
+/* Loading States */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+}
+
+@keyframes loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+/* Charts and Graphs */
+.chart-container {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+/* Action Buttons */
+.action-btn {
+    padding: 4px 8px;
+    margin: 0 2px;
+    border-radius: 4px;
+    font-size: 0.8rem;
+    transition: all 0.2s ease;
+}
+
+.action-btn:hover {
+    transform: scale(1.05);
+}
+
+/* Responsive Tables */
+@media (max-width: 768px) {
+    .table-responsive {
+        font-size: 0.85rem;
+    }
+    
+    .action-btn {
+        padding: 2px 6px;
+        font-size: 0.75rem;
+    }
+}
+
+/* Real-time Updates */
+.update-indicator {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #28a745;
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(1.1); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+/* Dark Theme Support */
+@media (prefers-color-scheme: dark) {
+    .bg-light {
+        background-color: #212529 !important;
+    }
+    
+    .card {
+        background-color: #343a40;
+        border-color: #495057;
+    }
+    
+    .table {
+        color: #fff;
+    }
+    
+    .modal-content {
+        background-color: #343a40;
+        color: #fff;
+    }
+}
