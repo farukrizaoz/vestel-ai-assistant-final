@@ -43,9 +43,19 @@ class ConversationManager:
     
     def save_session(self):
         """Oturum verilerini kaydet"""
+        # Eğer session dosyası mevcutsa created_at'i koru
+        created_at = datetime.now().isoformat()
+        if self.session_file.exists():
+            try:
+                with open(self.session_file, 'r', encoding='utf-8') as f:
+                    existing_data = json.load(f)
+                    created_at = existing_data.get('created_at', created_at)
+            except:
+                pass  # Hata durumunda yeni tarih kullan
+        
         data = {
             'session_id': self.session_id,
-            'created_at': datetime.now().isoformat(),
+            'created_at': created_at,
             'last_activity': datetime.now().isoformat(),
             'history': self.conversation_history,
             'products': self.current_products,
@@ -88,6 +98,13 @@ class ConversationManager:
             self.session_id = session_id
             self.session_file = SESSIONS_DIR / f"{self.session_id}.json"
             self.load_session()
+        
+        # Duplike mesaj kontrolü - son mesajla aynı içerik varsa ekleme
+        if (self.conversation_history and 
+            self.conversation_history[-1]['sender'] == sender and 
+            self.conversation_history[-1]['content'] == content):
+            print(f"⚠️ Duplike mesaj tespit edildi, eklenmedi: {sender}: {content[:50]}...")
+            return
         
         message = {
             'timestamp': datetime.now().isoformat(),
@@ -282,3 +299,54 @@ def get_conversation_manager(session_id: str = None):
         del _session_cache[oldest_session]
     
     return manager
+
+def hydrate_sessions_from_disk() -> int:
+    """
+    sessions/ klasöründeki JSON dosyalarını tarar,
+    DB'de kaydı olmayanları ekler ve metadata/sayaçları senkronize eder.
+    Dönüş: eklenen/güncellenen kayıt sayısı
+    """
+    added_or_updated = 0
+    if not SESSIONS_DIR.exists():
+        return 0
+        
+    for json_path in SESSIONS_DIR.glob("*.json"):
+        try:
+            with open(json_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            sid = data.get("session_id") or json_path.stem
+            created_at = data.get("created_at") or datetime.now().isoformat()
+            last_activity = data.get("last_activity") or created_at
+            history = data.get("history", [])
+            products = data.get("products", [])
+            metadata = data.get("metadata", {})
+            session_name = metadata.get("session_name")
+
+            # DB'de var mı?
+            row = session_db.get_session_info(sid)
+            if not row:
+                # Yoksa oluştur
+                session_db.create_session(sid, session_name)
+                added_or_updated += 1
+
+            # Aktivite ve sayaçları senkronize et
+            session_db.update_session_activity(
+                sid,
+                message_count=len(history),
+                product_count=len(products),
+                last_activity=last_activity
+            )
+
+            # İsim senkronizasyonu (eğer JSON'da varsa ve DB'dekinden farklıysa)
+            if session_name and (not row or row.get('session_name') != session_name):
+                session_db.rename_session(sid, session_name)
+                if not row: # Zaten eklendi sayıldı
+                    pass
+                else:
+                    added_or_updated +=1
+
+        except Exception as e:
+            print(f"[hydrate] {json_path.name} senkronize edilemedi: {e}")
+            
+    return added_or_updated

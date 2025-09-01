@@ -48,21 +48,23 @@ class SessionDB:
         
         return session_id
     
-    def update_session_activity(self, session_id: str, message_count: int = None, product_count: int = None):
+    def update_session_activity(self, session_id: str, message_count: int = None, product_count: int = None, last_activity: str = None):
         """Session aktivitesini güncelle"""
         with sqlite3.connect(self.db_path) as conn:
+            activity_time = last_activity or datetime.now().isoformat()
+            
             if message_count is not None and product_count is not None:
                 conn.execute("""
                     UPDATE sessions 
                     SET last_activity = ?, message_count = ?, product_count = ?
                     WHERE session_id = ?
-                """, (datetime.now().isoformat(), message_count, product_count, session_id))
+                """, (activity_time, message_count, product_count, session_id))
             else:
                 conn.execute("""
                     UPDATE sessions 
                     SET last_activity = ?
                     WHERE session_id = ?
-                """, (datetime.now().isoformat(), session_id))
+                """, (activity_time, session_id))
             conn.commit()
     
     def rename_session(self, session_id: str, new_name: str) -> bool:

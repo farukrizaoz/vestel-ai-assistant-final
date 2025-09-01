@@ -13,8 +13,15 @@ from agent_system import config
 print("📦 config imported")
 from agent_system.agents.router_agent import create_router_agent
 print("📦 router_agent imported")
-from agent_system.agents.pdf_agent import create_pdf_agent  
+from agent_system.agents.pdf_agent import create_pdf_agent
 print("📦 pdf_agent imported")
+from agent_system.agents.product_search_agent import create_product_search_agent
+print("📦 product_search_agent imported")
+from agent_system.agents.technical_support_agent import create_technical_support_agent
+print("📦 technical_support_agent imported")
+
+from agent_system.agents.general_info_agent import create_general_info_agent
+print("📦 general_info_agent imported")
 from agent_system.agents.quickstart_agent import create_quickstart_agent
 print("📦 quickstart_agent imported")
 from agent_system.tasks import create_routing_task
@@ -43,6 +50,9 @@ class VestelAgentSystem:
         # Agent'ları oluştur
         self.router_agent = create_router_agent()
         self.pdf_agent = create_pdf_agent()
+        self.product_search_agent = create_product_search_agent()
+        self.technical_support_agent = create_technical_support_agent()
+        self.general_info_agent = create_general_info_agent()
         self.quickstart_agent = create_quickstart_agent()
     
     def process_query(self, user_query: str, session_id: str = None) -> str:
@@ -61,21 +71,40 @@ class VestelAgentSystem:
         # Routing task oluştur
         routing_task = create_routing_task(user_query, self.router_agent, self.conversation_manager.session_id)
         
-        # Crew oluştur ve çalıştır
+        # Crew oluştur ve çalıştır - TIMEOUT VE ERROR HANDLING EKLENDİ
         crew = Crew(
-            agents=[self.router_agent, self.pdf_agent, self.quickstart_agent],
+            agents=[
+                self.router_agent, 
+                self.pdf_agent, 
+                self.product_search_agent,
+                self.technical_support_agent,
+                self.general_info_agent,
+                self.quickstart_agent
+            ],
             tasks=[routing_task],
             process=Process.sequential,
             memory=False,  # Memory'yi kapat - session bazında kendi memory'miz var
-            verbose=True
+            verbose=False  # Verbose'u kapat - kullanıcı sadece sonucu görsün
         )
         
-        result = crew.kickoff()
-        
-        # Sonucu kaydet (düzeltilmiş format)
-        self.conversation_manager.add_message(self.conversation_manager.session_id, 'assistant', str(result))
-        
-        return str(result)
+        try:
+            print("🚀 Crew başlatılıyor...")
+            result = crew.kickoff()
+            print("✅ Crew işlemi tamamlandı")
+            
+            # Sonucu kaydet (düzeltilmiş format)
+            self.conversation_manager.add_message(self.conversation_manager.session_id, 'assistant', str(result))
+            
+            return str(result)
+            
+        except Exception as crew_error:
+            error_msg = f"🤖 Agent sistemi şu anda yanıt veremiyor. Lütfen birkaç saniye sonra tekrar deneyin.\n\nHata detayı: {str(crew_error)[:200]}..."
+            print(f"❌ Crew işlem hatası: {str(crew_error)}")
+            
+            # Hata mesajını da kaydet
+            self.conversation_manager.add_message(self.conversation_manager.session_id, 'assistant', error_msg)
+            
+            return error_msg
     
     @property
     def session_id(self) -> str:

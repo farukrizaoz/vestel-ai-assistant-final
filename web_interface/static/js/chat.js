@@ -1,10 +1,21 @@
-// WebSocket bağlantısı
-const socket = io();
+// WebSocket bağlantısı - Enhanced reliability with longer timeout
+const socket = io({
+    reconnection: true,
+    reconnectionDelay: 2000,      // 2 saniye bekle
+    reconnectionDelayMax: 10000,  // Maksimum 10 saniye bekle  
+    reconnectionAttempts: 10,     // 10 kez dene
+    timeout: 120000,              // 2 dakika timeout
+    transports: ['websocket', 'polling'],
+    forceNew: true                // Her zaman yeni bağlantı
+});
 
 // Global variables
 let currentSessionId = null;
 let messageCount = 0;
 let sessions = [];
+let isConnected = false;
+let pendingMessages = [];
+let messageTimeouts = new Map(); // Message timeout tracking
 
 // DOM elements
 const chatMessages = document.getElementById('chat-messages');
@@ -16,25 +27,29 @@ const connectionStatus = document.getElementById('connection-status');
 const sessionIdDisplay = document.getElementById('session-id');
 const messageCountDisplay = document.getElementById('message-count');
 const lastActivityDisplay = document.getElementById('last-activity');
-const sessionDropdown = document.getElementById('sessionDropdown');
-const sessionList = document.getElementById('session-list');
-const currentSessionName = document.getElementById('current-session-name');
+const sessionSidebar = document.getElementById('session-sidebar');
+const currentSessionDisplay = document.getElementById('current-session-display');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
-    // Check for session parameter in URL
-    const urlParams = new URLSearchParams(window.location.search);
-    const sessionParam = urlParams.get('session');
-    
-    if (sessionParam) {
-        currentSessionId = sessionParam;
-        loadSessionHistory(sessionParam);
+    // Sunucudan gelen session ID'yi al (template'ten)
+    if (typeof window.sessionId !== 'undefined' && window.sessionId) {
+        currentSessionId = window.sessionId;
+        updateSessionDisplay();
+        
+        // Existing session ise hemen yükle, yeni ise welcome göster
+        if (typeof window.existingSession !== 'undefined' && window.existingSession === true) {
+            loadSessionHistory(currentSessionId);
+        } else {
+            initializeChat();
+        }
     } else {
         initializeChat();
     }
     
     setupEventListeners();
-    loadSessionList();
+    // Session list'i paralel olarak yükle - blocking etmesin
+    setTimeout(loadSessionList, 100);
 });
 
 function initializeChat() {
@@ -101,25 +116,63 @@ function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) return;
     
+    // Check connection
+    if (!isConnected) {
+        addMessage('assistant', '❌ Bağlantı yok. Lütfen bekleyin...');
+        return;
+    }
+    
     // Clear welcome message if exists
     const welcomeMessage = document.getElementById('welcome-message');
     if (welcomeMessage) {
         welcomeMessage.remove();
     }
     
+    // Generate unique message ID
+    const messageId = 'msg_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+    
     // Add user message to chat
     addMessage('user', message);
+    
+    // Show thinking bubble - Ajan düşünmeye başladı
+    const thinkingId = showThinkingBubble();
     
     // Clear input
     messageInput.value = '';
     
-    // Send to server
-    socket.emit('send_message', {
+    const messageData = {
         message: message,
-        session_id: currentSessionId
-    });
+        session_id: currentSessionId,
+        message_id: messageId,
+        thinking_id: thinkingId  // Thinking bubble ID'sini gönder
+    };
+    
+    // Send to server
+    if (isConnected) {
+        socket.emit('send_message', messageData);
+        
+        // Timeout'u kaldırıyoruz - Thinking bubble agent cevabı gelene kadar dönecek
+        // Agent ne kadar uzun süre düşünürse düşünsün, kullanıcı bunu görecek
+        console.log('📤 Message sent, thinking bubble active until response');
+    } else {
+        // Add to pending messages
+        pendingMessages.push(messageData);
+        addMessage('assistant', '📡 Bağlantı bekleniyor, mesajınız kuyruğa alındı...');
+    }
     
     updateLastActivity();
+}
+
+// Process pending messages when connection is restored
+function processPendingMessages() {
+    if (pendingMessages.length > 0 && isConnected) {
+        console.log('📤 Processing', pendingMessages.length, 'pending messages');
+        pendingMessages.forEach(messageData => {
+            socket.emit('send_message', messageData);
+        });
+        pendingMessages = [];
+        addMessage('assistant', '✅ Bekleyen mesajlar gönderildi.');
+    }
 }
 
 function addMessage(sender, content, timestamp = null) {
@@ -192,6 +245,34 @@ function startNewChat() {
         .catch(error => console.error('Yeni chat oluşturulamadı:', error));
 }
 
+function newSession() {
+    fetch('/api/chat/new', { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                currentSessionId = data.session_id;
+                chatMessages.innerHTML = '';
+                messageCount = 0;
+                initializeChat();
+                loadSessionList();
+                updateSessionDisplay();
+            } else {
+                alert('Yeni session oluşturulamadı: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Yeni session oluşturma hatası:', error);
+            alert('Yeni session oluşturulamadı');
+        });
+}
+
+function updateSessionDisplay() {
+    if (currentSessionDisplay && currentSessionId) {
+        const shortId = currentSessionId.substring(0, 8);
+        currentSessionDisplay.textContent = `Session ${shortId}`;
+    }
+}
+
 function updateSessionInfo() {
     if (currentSessionId && sessionIdDisplay) {
         sessionIdDisplay.textContent = currentSessionId.substring(0, 8) + '...';
@@ -216,6 +297,57 @@ function scrollToBottom() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
+// Thinking bubble göster - Ajan düşünürken
+function showThinkingBubble(agentName = 'Asistan') {
+    const thinkingId = 'thinking-' + Date.now();
+    const thinkingMessages = [
+        'Düşünüyorum',
+        'Analiz ediyorum', 
+        'Araştırıyorum',
+        'Çözüm buluyorum',
+        'Bilgileri kontrol ediyorum'
+    ];
+    
+    const randomMessage = thinkingMessages[Math.floor(Math.random() * thinkingMessages.length)];
+    
+    const thinkingHtml = `
+        <div class="chat-message message-assistant" id="${thinkingId}">
+            <div class="avatar avatar-assistant">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="thinking-bubble">
+                <div class="thinking-content">
+                    <i class="fas fa-brain thinking-icon"></i>
+                    <span class="thinking-text">${randomMessage}</span>
+                    <div class="thinking-dots">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    chatMessages.insertAdjacentHTML('beforeend', thinkingHtml);
+    scrollToBottom();
+    return thinkingId;
+}
+
+// Thinking bubble'ı kaldır
+function hideThinkingBubble(thinkingId) {
+    if (thinkingId) {
+        const element = document.getElementById(thinkingId);
+        if (element) {
+            element.style.transition = 'opacity 0.3s ease';
+            element.style.opacity = '0';
+            setTimeout(() => {
+                element.remove();
+            }, 300);
+        }
+    }
+}
+
 function showTyping(show) {
     if (typingIndicator) {
         typingIndicator.style.display = show ? 'block' : 'none';
@@ -227,15 +359,121 @@ function showTyping(show) {
 
 // Session Management Functions
 function loadSessionList() {
+    console.log('🔄 Loading session list...');
     fetch('/api/sessions')
         .then(response => response.json())
         .then(data => {
+            console.log('📋 Session list response:', data);
             if (data.success) {
                 sessions = data.sessions;
-                renderSessionDropdown();
+                console.log(`✅ ${sessions.length} sessions loaded`);
+                renderSessionSidebar();
+            } else {
+                console.error('❌ Session loading failed:', data.error);
             }
         })
-        .catch(error => console.error('Session listesi yüklenemedi:', error));
+        .catch(error => {
+            console.error('❌ Session listesi yüklenemedi:', error);
+        });
+}
+
+function renderSessionSidebar() {
+    if (!sessionSidebar) return;
+    
+    if (sessions.length === 0) {
+        sessionSidebar.innerHTML = `
+            <div class="text-center text-muted py-4">
+                <i class="fas fa-inbox fa-2x mb-2"></i>
+                <div>Henüz session yok</div>
+                <small>Yeni bir konuşma başlatın</small>
+            </div>
+        `;
+        return;
+    }
+
+    const sessionHTML = sessions.map(session => {
+        const isActive = session.session_id === currentSessionId;
+        const shortId = session.session_id.substring(0, 8);
+        const lastActivity = new Date(session.last_activity).toLocaleDateString('tr-TR', {
+            day: '2-digit',
+            month: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+        
+        return `
+            <div class="session-item ${isActive ? 'active' : ''}" 
+                 style="cursor: pointer; padding: 12px; margin: 4px 0; border-radius: 8px; 
+                        ${isActive ? 'background: #007bff; color: white;' : 'background: #f8f9fa; border: 1px solid #dee2e6;'}
+                        transition: all 0.2s ease;"
+                 onclick="loadSession('${session.session_id}')"
+                 onmouseover="if(!this.classList.contains('active')) this.style.background='#e9ecef'"
+                 onmouseout="if(!this.classList.contains('active')) this.style.background='#f8f9fa'">
+                
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="flex-grow-1">
+                        <div style="font-weight: 600; font-size: 0.9em;" class="mb-1">
+                            <i class="fas fa-comments me-1"></i>
+                            Session ${shortId}
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.8;" class="mb-1">
+                            <i class="fas fa-clock me-1"></i>
+                            ${lastActivity}
+                        </div>
+                        <div style="font-size: 0.75em; opacity: 0.8;">
+                            <i class="fas fa-message me-1"></i>
+                            ${session.message_count || 0} mesaj
+                        </div>
+                    </div>
+                    <button class="btn btn-sm ${isActive ? 'btn-light' : 'btn-outline-danger'}" 
+                            style="padding: 2px 6px; font-size: 0.7em;"
+                            onclick="event.stopPropagation(); deleteSession('${session.session_id}')"
+                            title="Session'ı sil">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    sessionSidebar.innerHTML = sessionHTML;
+}
+
+function deleteSession(sessionId) {
+    if (!confirm('Bu session\'ı silmek istediğinizden emin misiniz?')) {
+        return;
+    }
+    
+    fetch(`/api/session/${sessionId}/delete`, { method: 'DELETE' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Eğer silinen session aktif session ise yeni bir tane oluştur
+                if (sessionId === currentSessionId) {
+                    newSession();
+                }
+                // Session listesini yenile
+                loadSessionList();
+            } else {
+                alert('Session silinemedi: ' + data.error);
+            }
+        })
+        .catch(error => {
+            console.error('Session silme hatası:', error);
+            alert('Session silinemedi');
+        });
+}
+
+function loadSession(sessionId) {
+    if (sessionId === currentSessionId) {
+        // Aynı session'a tıklanırsa hiçbir şey yapma
+        return;
+    }
+    
+    currentSessionId = sessionId;
+    loadSessionHistory(sessionId);
+    renderSessionSidebar(); // Aktif session'ı güncelle
+    updateSessionDisplay();
 }
 
 function clearCurrentChat() {
@@ -349,7 +587,13 @@ function switchToSession(sessionId, sessionName) {
 }
 
 function loadSessionHistory(sessionId) {
-    // Duplicate mesajları önlemek için önce temizle
+    // Eğer sessionId yoksa çık
+    if (!sessionId) {
+        initializeChat();
+        return;
+    }
+    
+    // Mesajları temizle
     chatMessages.innerHTML = '';
     messageCount = 0;
     
@@ -357,10 +601,6 @@ function loadSessionHistory(sessionId) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Tekrar temizle (timing sorunları için)
-                chatMessages.innerHTML = '';
-                messageCount = 0;
-                
                 if (data.history && data.history.length > 0) {
                     data.history.forEach(msg => {
                         addMessage(msg.sender, msg.content, new Date(msg.timestamp));
@@ -370,12 +610,12 @@ function loadSessionHistory(sessionId) {
                 }
                 
                 // Update session info
-                const sessionName = data.session_name || `Chat ${sessionId.substring(0, 8)}`;
-                if (currentSessionName) {
-                    currentSessionName.textContent = sessionName;
-                }
+                updateSessionDisplay();
                 
                 chatMessages.scrollTop = chatMessages.scrollHeight;
+            } else {
+                console.error('Session yüklenemedi:', data.error);
+                initializeChat();
             }
         })
         .catch(error => {
@@ -386,31 +626,62 @@ function loadSessionHistory(sessionId) {
         });
 }
 
-// Socket event handlers
+// Socket event handlers - Enhanced
 socket.on('connect', function() {
+    isConnected = true;
     if (connectionStatus) {
         connectionStatus.innerHTML = '<i class="fas fa-circle"></i> Bağlı';
         connectionStatus.className = 'badge bg-success me-2';
     }
-    console.log('Connected to server');
+    console.log('✅ Connected to server');
+    
+    // Process pending messages if any
+    processPendingMessages();
 });
 
 socket.on('disconnect', function() {
+    isConnected = false;
     if (connectionStatus) {
         connectionStatus.innerHTML = '<i class="fas fa-circle"></i> Bağlantı Kesildi';
         connectionStatus.className = 'badge bg-danger me-2';
     }
-    console.log('Disconnected from server');
+    console.log('❌ Disconnected from server');
+});
+
+socket.on('reconnect', function() {
+    console.log('🔄 Reconnected to server');
+    if (connectionStatus) {
+        connectionStatus.innerHTML = '<i class="fas fa-circle"></i> Yeniden Bağlandı';
+        connectionStatus.className = 'badge bg-success me-2';
+    }
+    processPendingMessages();
 });
 
 socket.on('status', function(data) {
-    console.log('Status:', data.message);
+    console.log('📊 Status:', data.message);
+    if (data.connected) {
+        isConnected = true;
+    }
 });
 
 socket.on('new_session', function(data) {
     currentSessionId = data.session_id;
-    updateSessionInfo();
-    console.log('New session created:', currentSessionId);
+    updateSessionDisplay();
+    console.log('🆕 New session created:', currentSessionId);
+});
+
+socket.on('message_received', function(data) {
+    console.log('📨 Message received confirmation:', data.message_id);
+    // Clear timeout for this message
+    if (messageTimeouts.has(data.message_id)) {
+        clearTimeout(messageTimeouts.get(data.message_id));
+        messageTimeouts.delete(data.message_id);
+    }
+});
+
+socket.on('message_status', function(data) {
+    console.log('📊 Message status:', data.status, 'for:', data.message_id);
+    // Handle different statuses: received, processing, completed, error
 });
 
 socket.on('typing', function(data) {
@@ -419,20 +690,52 @@ socket.on('typing', function(data) {
 
 socket.on('message_response', function(data) {
     showTyping(false);
+    
+    // Hide thinking bubble if provided
+    if (data.thinking_id) {
+        hideThinkingBubble(data.thinking_id);
+    }
+    
     addMessage('assistant', data.message, new Date());
     updateLastActivity();
     
     // Update session ID if provided
     if (data.session_id && !currentSessionId) {
         currentSessionId = data.session_id;
-        updateSessionInfo();
+        updateSessionDisplay();
     }
+    
+    // Refresh session list to show updated activity
+    setTimeout(loadSessionList, 1000);
+    
+    console.log('✅ Message response received');
 });
 
 socket.on('error', function(data) {
     showTyping(false);
+    
+    // Hide thinking bubble on error
+    if (data.thinking_id) {
+        hideThinkingBubble(data.thinking_id);
+    }
+    
     addMessage('assistant', `❌ Hata: ${data.message}`);
-    console.error('Socket error:', data.message);
+    console.error('🚨 Socket error:', data.message);
+    
+    // Clear timeout if message_id provided
+    if (data.message_id && messageTimeouts.has(data.message_id)) {
+        clearTimeout(messageTimeouts.get(data.message_id));
+        messageTimeouts.delete(data.message_id);
+    }
+});
+
+// Connection timeout handling
+socket.on('connect_error', function(error) {
+    console.error('🚨 Connection error:', error);
+    if (connectionStatus) {
+        connectionStatus.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Bağlantı Hatası';
+        connectionStatus.className = 'badge bg-warning me-2';
+    }
 });
 
 // Auto-focus message input

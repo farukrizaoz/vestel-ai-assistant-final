@@ -10,7 +10,7 @@ import json
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from agent_system.main import VestelAgentSystem
-from agent_system.state_manager import ConversationManager, get_conversation_manager
+from agent_system.state_manager import ConversationManager, get_conversation_manager, hydrate_sessions_from_disk
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'vestel-agent-secret-key-2025'
@@ -20,30 +20,70 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 agent_system = VestelAgentSystem()
 conversation_manager = ConversationManager()
 
+# UYGULAMA BAŞLANGICINDA HYDRATE ET
+try:
+    hydrated_count = hydrate_sessions_from_disk()
+    if hydrated_count > 0:
+        print(f"🧩 {hydrated_count} session DB'ye hydrate edildi.")
+except Exception as e:
+    print(f"⚠️ Başlangıçta hydrate işlemi başarısız: {e}")
+
 @app.route('/')
 def index():
     """Ana sayfa - Chat arayüzü"""
-    return render_template('index.html')
+    try:
+        hydrate_sessions_from_disk()  # HYDRATE ET
+        sessions = conversation_manager.list_sessions()
+        sorted_sessions = sorted(sessions, 
+                                 key=lambda x: x.get('last_activity', '1970-01-01T00:00:00'), 
+                                 reverse=True)
+        
+        if sorted_sessions:
+            # En son aktif olan session'ı seç
+            latest_session_id = sorted_sessions[0].get('session_id')
+            print(f"🎯 Varsayılan session seçildi: {latest_session_id}")
+            return render_template('index.html', 
+                                   session_id=latest_session_id, 
+                                   sessions=sorted_sessions)
+        else:
+            # Hiç session yoksa, boş bir sayfa göster
+            print("🚫 Hiç session bulunamadı. Boş başlangıç sayfası gösteriliyor.")
+            return render_template('index.html', 
+                                   session_id=None, 
+                                   sessions=[])
+    except Exception as e:
+        print(f"❌ Session yükleme hatası: {e}")
+        # Hata durumunda da boş sayfa göster
+        return render_template('index.html', 
+                               session_id=None, 
+                               sessions=[])
 
-@app.route('/admin')
-def admin():
-    """Admin paneli - Session yönetimi"""
-    return render_template('admin.html')
+# Admin route'unu kaldırıyoruz
+# @app.route('/admin')
+# def admin():
+#     """Admin paneli - Session yönetimi"""
+#     return render_template('admin.html')
 
+@app.route('/sessions')
 @app.route('/api/sessions')
 def get_sessions():
-    """Tüm session'ları getir"""
+    """Mevcut session'ları listele - LAST_ACTIVITY'YE GÖRE SIRALI"""
     try:
+        hydrate_sessions_from_disk()  # HYDRATE ET
         sessions = conversation_manager.list_sessions()
+        # Session'ları last_activity'ye göre sırala (en yeni en başta)
+        sorted_sessions = sorted(sessions, 
+                               key=lambda x: x.get('last_activity', '1970-01-01T00:00:00'), 
+                               reverse=True)
+        
+        print(f"📋 {len(sorted_sessions)} session listelendi (activity sıralı)")
         return jsonify({
-            'success': True,
-            'sessions': sessions
+            'success': True, 
+            'sessions': sorted_sessions
         })
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        })
+        print(f"❌ Session listing error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/session/<session_id>')
 def get_session_details(session_id):
@@ -95,22 +135,31 @@ def new_chat_session():
 @socketio.on('connect')
 def handle_connect():
     """WebSocket bağlantısı kuruldu"""
-    print('Client connected')
-    emit('status', {'message': 'Vestel AI Assistant\'a bağlandınız'})
+    print('✅ Client connected')
+    emit('status', {'message': 'Vestel AI Assistant\'a bağlandınız', 'connected': True})
 
 @socketio.on('disconnect')
 def handle_disconnect():
     """WebSocket bağlantısı kesildi"""
-    print('Client disconnected')
+    print('❌ Client disconnected')
 
 @socketio.on('send_message')
 def handle_message(data):
     """Kullanıcı mesajını işle"""
+    message_id = str(uuid.uuid4())  # Her mesaj için unique ID
+    
     try:
         user_message = data.get('message', '')
         session_id = data.get('session_id', '')
+        thinking_id = data.get('thinking_id', '')  # Frontend'ten gelen thinking bubble ID
         
         print(f"📨 Mesaj alındı: '{user_message}' (session: {session_id})")
+        
+        # Mesaj alındı onayı gönder
+        emit('message_received', {
+            'message_id': message_id,
+            'status': 'received'
+        })
         
         if not session_id:
             # Yeni session oluştur
@@ -125,30 +174,72 @@ def handle_message(data):
         # Kullanıcı mesajını kaydet
         session_manager.add_message(session_id, 'user', user_message)
         
-        # Typing indicator
+        # Processing başladı - thinking bubble çalışıyor
         emit('typing', {'status': True})
+        emit('message_status', {
+            'message_id': message_id,
+            'status': 'processing'
+        })
         
         print(f"🤖 Agent system'e gönderiliyor...")
-        # Agent'a gönder ve cevap al (session-specific)
-        response = agent_system.process_query(user_message, session_id)
-        print(f"✅ Agent cevabı alındı: '{response[:100]}...'")
+        
+        # Agent'a gönder ve cevap al (session-specific) - TIMEOUT EKLENDI
+        import signal
+        
+        def timeout_handler(signum, frame):
+            raise TimeoutError("Agent işlemi zaman aşımına uğradı")
+        
+        # 3 dakika timeout (180 saniye)
+        signal.signal(signal.SIGALRM, timeout_handler)
+        signal.alarm(180)
+        
+        try:
+            response = agent_system.process_query(user_message, session_id)
+            print(f"✅ Agent cevabı alındı: '{response[:100]}...'")
+        except TimeoutError:
+            response = "⏱️ İşlem çok uzun sürdü. Lütfen sorunuzu daha basit bir şekilde tekrar sorun veya daha sonra tekrar deneyin."
+            print("⏱️ Agent işlemi timeout'a uğradı")
+        except Exception as agent_error:
+            response = f"🤖 Agent işleminde hata oluştu. Lütfen tekrar deneyin. (Hata: {str(agent_error)[:100]})"
+            print(f"❌ Agent hatası: {str(agent_error)}")
+        finally:
+            signal.alarm(0)  # Timeout'u iptal et
         
         # Agent cevabını kaydet
         session_manager.add_message(session_id, 'assistant', response)
         
-        # Cevabı gönder
+        # Session activity'yi manuel olarak da güncelle
+        session_manager.save_session()
+        
+        # Processing bitti
         emit('typing', {'status': False})
+        emit('message_status', {
+            'message_id': message_id,
+            'status': 'completed'
+        })
+        
+        # Cevabı gönder - thinking_id'yi de ekle
         emit('message_response', {
             'message': response,
             'session_id': session_id,
-            'timestamp': datetime.now().strftime('%H:%M:%S')
+            'timestamp': datetime.now().strftime('%H:%M:%S'),
+            'message_id': message_id,
+            'thinking_id': thinking_id  # Thinking bubble'ı kaldırmak için
         })
         print(f"📤 Cevap gönderildi")
         
     except Exception as e:
         print(f"❌ Hata oluştu: {str(e)}")
         emit('typing', {'status': False})
-        emit('error', {'message': f'Hata oluştu: {str(e)}'})
+        emit('message_status', {
+            'message_id': message_id,
+            'status': 'error'
+        })
+        emit('error', {
+            'message': f'🚫 Sistem hatası: {str(e)}. Lütfen tekrar deneyin.',
+            'message_id': message_id,
+            'thinking_id': thinking_id  # Error durumunda da thinking bubble'ı kaldır
+        })
 
 @app.route('/api/session/<session_id>/rename', methods=['POST'])
 def rename_session(session_id):
@@ -267,4 +358,4 @@ if __name__ == '__main__':
     print("📱 Ana sayfa: http://localhost:5000")
     print("⚙️ Admin paneli: http://localhost:5000/admin")
     
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=False)

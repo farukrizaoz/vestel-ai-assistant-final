@@ -73,7 +73,95 @@
     color: white;
 }
 
-/* Typing Animation */
+/* Thinking Animation - Gelişmiş Ajan Düşünüyor Baloncuğu */
+.thinking-bubble {
+    background: linear-gradient(135deg, #6f42c1, #e83e8c);
+    border-radius: 18px;
+    padding: 16px 20px;
+    margin: 10px 0;
+    position: relative;
+    max-width: 280px;
+    box-shadow: 0 4px 12px rgba(111, 66, 193, 0.2);
+    animation: thinkingPulse 2s ease-in-out infinite;
+}
+
+.thinking-bubble::before {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 20px;
+    width: 16px;
+    height: 16px;
+    background: linear-gradient(135deg, #6f42c1, #e83e8c);
+    border-radius: 50% 0 50% 50%;
+    transform: rotate(-45deg);
+}
+
+.thinking-content {
+    display: flex;
+    align-items: center;
+    color: white;
+    font-weight: 500;
+}
+
+.thinking-icon {
+    margin-right: 12px;
+    font-size: 1.2em;
+    animation: thinkingRotate 2s linear infinite;
+}
+
+.thinking-text {
+    margin-right: 12px;
+    font-size: 0.95em;
+}
+
+.thinking-dots {
+    display: inline-flex;
+    align-items: center;
+}
+
+.thinking-dots span {
+    height: 6px;
+    width: 6px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    display: inline-block;
+    margin: 0 2px;
+    animation: thinkingBounce 1.6s infinite ease-in-out;
+}
+
+.thinking-dots span:nth-child(1) { animation-delay: 0s; }
+.thinking-dots span:nth-child(2) { animation-delay: 0.3s; }
+.thinking-dots span:nth-child(3) { animation-delay: 0.6s; }
+
+@keyframes thinkingPulse {
+    0%, 100% { 
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(111, 66, 193, 0.2);
+    }
+    50% { 
+        transform: scale(1.02);
+        box-shadow: 0 6px 16px rgba(111, 66, 193, 0.3);
+    }
+}
+
+@keyframes thinkingRotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+@keyframes thinkingBounce {
+    0%, 60%, 100% {
+        transform: translateY(0);
+        opacity: 0.4;
+    }
+    30% {
+        transform: translateY(-8px);
+        opacity: 1;
+    }
+}
+
+/* Typing Animation - Basit mesaj yazıyor */
 .typing-dots {
     display: inline-flex;
     align-items: center;
