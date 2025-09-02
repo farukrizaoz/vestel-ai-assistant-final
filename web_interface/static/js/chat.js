@@ -16,6 +16,7 @@ let sessions = [];
 let isConnected = false;
 let pendingMessages = [];
 let messageTimeouts = new Map(); // Message timeout tracking
+let isProcessing = false; // MESAJ İŞLEME DURUMU
 
 // DOM elements
 const chatMessages = document.getElementById('chat-messages');
@@ -116,11 +117,21 @@ function sendMessage() {
     const message = messageInput.value.trim();
     if (!message) return;
     
+    // MESAJ İŞLENİYORSA YENİ MESAJ GÖNDERİLMESİNİ ENGELLE
+    if (isProcessing) {
+        console.log('🚫 Mesaj işleniyor, yeni mesaj gönderilemez');
+        return;
+    }
+    
     // Check connection
     if (!isConnected) {
         addMessage('assistant', '❌ Bağlantı yok. Lütfen bekleyin...');
         return;
     }
+    
+    // MESAJ İŞLEME BAŞLADI
+    isProcessing = true;
+    disableInput();
     
     // Clear welcome message if exists
     const welcomeMessage = document.getElementById('welcome-message');
@@ -158,9 +169,32 @@ function sendMessage() {
         // Add to pending messages
         pendingMessages.push(messageData);
         addMessage('assistant', '📡 Bağlantı bekleniyor, mesajınız kuyruğa alındı...');
+        // Bağlantı yoksa da input'u tekrar aktif et
+        isProcessing = false;
+        enableInput();
     }
     
     updateLastActivity();
+}
+
+// Input kontrolü fonksiyonları
+function disableInput() {
+    messageInput.disabled = true;
+    sendBtn.disabled = true;
+    messageInput.placeholder = "Cevap bekleniyor...";
+    sendBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>';
+    sendBtn.classList.add('btn-secondary');
+    sendBtn.classList.remove('btn-primary');
+}
+
+function enableInput() {
+    messageInput.disabled = false;
+    sendBtn.disabled = false;
+    messageInput.placeholder = "Mesajınızı yazın...";
+    sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+    sendBtn.classList.remove('btn-secondary');
+    sendBtn.classList.add('btn-primary');
+    messageInput.focus();
 }
 
 // Process pending messages when connection is restored
@@ -465,10 +499,8 @@ function deleteSession(sessionId) {
 }
 
 function loadSession(sessionId) {
-    if (sessionId === currentSessionId) {
-        // Aynı session'a tıklanırsa hiçbir şey yapma
-        return;
-    }
+    // Session değişiyor, her durumda yükle
+    console.log(`🔄 Session yükleniyor: ${sessionId}`);
     
     currentSessionId = sessionId;
     loadSessionHistory(sessionId);
@@ -589,23 +621,36 @@ function switchToSession(sessionId, sessionName) {
 function loadSessionHistory(sessionId) {
     // Eğer sessionId yoksa çık
     if (!sessionId) {
+        console.log('⚠️ Session ID yok, welcome ekranı gösteriliyor');
         initializeChat();
         return;
     }
+    
+    console.log(`📖 Session geçmişi yükleniyor: ${sessionId}`);
     
     // Mesajları temizle
     chatMessages.innerHTML = '';
     messageCount = 0;
     
     fetch(`/api/session/${sessionId}`)
-        .then(response => response.json())
+        .then(response => {
+            console.log(`📡 API yanıtı durumu: ${response.status}`);
+            return response.json();
+        })
         .then(data => {
+            console.log('📄 Session verisi:', data);
+            
             if (data.success) {
                 if (data.history && data.history.length > 0) {
-                    data.history.forEach(msg => {
+                    console.log(`💬 ${data.history.length} mesaj yükleniyor`);
+                    data.history.forEach((msg, index) => {
+                        console.log(`  ${index + 1}. ${msg.sender}: ${msg.content.substring(0, 50)}...`);
                         addMessage(msg.sender, msg.content, new Date(msg.timestamp));
                     });
+                    messageCount = data.history.length;
+                    updateMessageCount();
                 } else {
+                    console.log('📭 Session boş, welcome ekranı gösteriliyor');
                     initializeChat();
                 }
                 
@@ -613,13 +658,14 @@ function loadSessionHistory(sessionId) {
                 updateSessionDisplay();
                 
                 chatMessages.scrollTop = chatMessages.scrollHeight;
+                console.log('✅ Session geçmişi başarıyla yüklendi');
             } else {
-                console.error('Session yüklenemedi:', data.error);
+                console.error('❌ Session yüklenemedi:', data.error);
                 initializeChat();
             }
         })
         .catch(error => {
-            console.error('Session geçmişi yüklenemedi:', error);
+            console.error('🚨 Session geçmişi yüklenirken hata:', error);
             chatMessages.innerHTML = '';
             messageCount = 0;
             initializeChat();
@@ -705,6 +751,10 @@ socket.on('message_response', function(data) {
         updateSessionDisplay();
     }
     
+    // MESAJ İŞLEME BİTTİ - INPUT'U AKTİF ET
+    isProcessing = false;
+    enableInput();
+    
     // Refresh session list to show updated activity
     setTimeout(loadSessionList, 1000);
     
@@ -721,6 +771,10 @@ socket.on('error', function(data) {
     
     addMessage('assistant', `❌ Hata: ${data.message}`);
     console.error('🚨 Socket error:', data.message);
+    
+    // HATA DURUMUNDA DA INPUT'U AKTİF ET
+    isProcessing = false;
+    enableInput();
     
     // Clear timeout if message_id provided
     if (data.message_id && messageTimeouts.has(data.message_id)) {

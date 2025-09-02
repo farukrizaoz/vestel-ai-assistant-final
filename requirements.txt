@@ -2,6 +2,9 @@ requests
 beautifulsoup4
 pdfplumber
 PyPDF2
+pytesseract
+pdf2image
+pillow
 crewai
 crewai_tools
 langchain_google_genai

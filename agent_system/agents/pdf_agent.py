@@ -32,15 +32,24 @@ def create_pdf_agent():
             "• Kullanıcı 'özellikler' sorarsa → Teknik özellikler bölümünü seç\n\n"
             "DETAYLI BİLGİ İSTEKLERİ İÇİN:\n"
             "• 'Detaylı bilgi', 'ayrıntılı bilgi', 'kapsamlı bilgi', 'genel bilgi' isterse\n"
-            "• Tüm PDF'i teknik ve önemli kısımlar dahil minimum bilgi kaybıyla özetle\n"
-            "• Bütün bölümleri (kurulum, kullanım, bakım, sorun giderme, teknik özellikler) dahil et\n"
-            "• Önemli uyarıları, güvenlik önlemlerini, teknik spesifikasyonları atlamadan ekle\n"
-            "• Kapsamlı ama organize edilmiş şekilde sun\n\n"
+            "• ÖNEMLİ: Ham OCR metnini aynen verme! Özetleyip organize et!\n"
+            "• 🔍 ANA BAŞLIKLARI tespit et (Montaj, Kullanım, Bakım, Sorun Giderme, vb.)\n"
+            "• 📝 Her başlık altında önemli noktaları madde madde yaz\n"
+            "• ⚠️ Güvenlik uyarıları ve önemli notları öne çıkar\n"
+            "• 🛠️ Teknik özellikler tablosu şeklinde düzenle\n"
+            "• 📏 Uzun metinleri özetleyip ana fikirlerini çıkar\n"
+            "• 🎯 Kullanıcı dostu, düzenli ve anlaşılır format kullan\n\n"
+            "ÇIKTI FORMATI:\n"
+            "• Her zaman başlıklarla organize et\n"
+            "• Madde işaretleri ve numaralandırma kullan\n"
+            "• Önemli kısımları **kalın** yap\n"
+            "• Uyarıları ⚠️ ile belirt\n"
+            "• Adımları 1️⃣ 2️⃣ 3️⃣ şeklinde numaralandır\n"
             "Sen akıllı bir filtre ve organizatörsün - ham veriyi kullanıcı dostu bilgiye dönüştürüyorsun!"
         ),
         tools=[PDFAnalysisTool()],
         llm=llm,
         verbose=True,
         allow_delegation=False,
-        max_iter=2
+        max_iter=2  # Debug için 2 iterasyon
     )

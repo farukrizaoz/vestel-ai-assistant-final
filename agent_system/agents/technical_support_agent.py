@@ -61,5 +61,5 @@ def create_technical_support_agent():
         llm=llm,
         verbose=True,
         allow_delegation=False,
-        max_iter=4
+        max_iter=6
     )

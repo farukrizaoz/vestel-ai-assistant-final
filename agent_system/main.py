@@ -20,8 +20,6 @@ print("📦 product_search_agent imported")
 from agent_system.agents.technical_support_agent import create_technical_support_agent
 print("📦 technical_support_agent imported")
 
-from agent_system.agents.general_info_agent import create_general_info_agent
-print("📦 general_info_agent imported")
 from agent_system.agents.quickstart_agent import create_quickstart_agent
 print("📦 quickstart_agent imported")
 from agent_system.tasks import create_routing_task
@@ -52,7 +50,6 @@ class VestelAgentSystem:
         self.pdf_agent = create_pdf_agent()
         self.product_search_agent = create_product_search_agent()
         self.technical_support_agent = create_technical_support_agent()
-        self.general_info_agent = create_general_info_agent()
         self.quickstart_agent = create_quickstart_agent()
     
     def process_query(self, user_query: str, session_id: str = None) -> str:
@@ -78,13 +75,12 @@ class VestelAgentSystem:
                 self.pdf_agent, 
                 self.product_search_agent,
                 self.technical_support_agent,
-                self.general_info_agent,
                 self.quickstart_agent
             ],
             tasks=[routing_task],
             process=Process.sequential,
             memory=False,  # Memory'yi kapat - session bazında kendi memory'miz var
-            verbose=False  # Verbose'u kapat - kullanıcı sadece sonucu görsün
+            verbose=True  # Delegation'ı görmek için verbose aç
         )
         
         try:

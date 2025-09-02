@@ -99,12 +99,25 @@ class ConversationManager:
             self.session_file = SESSIONS_DIR / f"{self.session_id}.json"
             self.load_session()
         
-        # Duplike mesaj kontrolü - son mesajla aynı içerik varsa ekleme
-        if (self.conversation_history and 
-            self.conversation_history[-1]['sender'] == sender and 
-            self.conversation_history[-1]['content'] == content):
-            print(f"⚠️ Duplike mesaj tespit edildi, eklenmedi: {sender}: {content[:50]}...")
-            return
+        # Akıllı duplike mesaj kontrolü - sadece 5 saniye içinde aynı mesaj gönderilirse engelleyelim
+        if self.conversation_history:
+            last_message = self.conversation_history[-1]
+            if (last_message['sender'] == sender and 
+                last_message['content'] == content):
+                # Son mesajın zamanını kontrol et
+                try:
+                    last_time = datetime.fromisoformat(last_message['timestamp'])
+                    current_time = datetime.now()
+                    time_diff = (current_time - last_time).total_seconds()
+                    
+                    # Sadece 5 saniye içinde aynı mesaj gönderilirse engelle
+                    if time_diff < 5:
+                        print(f"⚠️ Duplike mesaj tespit edildi (5sn içinde), eklenmedi: {sender}: {content[:50]}...")
+                        return
+                except Exception as e:
+                    # Timestamp parse hatası durumunda devam et
+                    print(f"⚠️ Timestamp parse hatası: {e}")
+                    pass
         
         message = {
             'timestamp': datetime.now().isoformat(),

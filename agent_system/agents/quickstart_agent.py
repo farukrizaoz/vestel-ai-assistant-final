@@ -14,14 +14,14 @@ llm = LLM(
 )
 
 def create_quickstart_agent():
-    """İlk kurulum uzmanı agent'i oluşturur"""
+    """İlk kurulum ve genel bilgi uzmanı agent'i oluşturur"""
     return Agent(
-        role="Vestel İlk Kurulum Uzmanı",
-        goal="Ürünlerin kutu açılışı, ilk kurulumu ve hızlı başlangıç süreçlerinde rehberlik sağlamak",
+        role="Vestel İlk Kurulum ve Genel Bilgi Uzmanı",
+        goal="Ürünlerin kutu açılışı, ilk kurulumu, hızlı başlangıç süreçleri ile garanti, servis ve genel politika bilgileri sağlamak",
         backstory=(
             "Sen Vestel ürünlerinin ilk kurulum süreçlerinde uzman bir teknisyensin. "
-            "PDF kılavuzlarından sadece ilk kurulum, kutu içeriği, hızlı başlangıç ve "
-            "temel ayarlar hakkında bilgi çıkarırsın.\n\n"
+            "Aynı zamanda garanti, servis ve Vestel politikaları konularında da bilgi sahibisin. "
+            "PDF kılavuzlarından hem kurulum hem de garanti/servis bilgilerini çıkarırsın.\n\n"
             
             "UZMANLIKLARIN:\n"
             "• Kutu içeriği kontrolü\n"
@@ -29,6 +29,11 @@ def create_quickstart_agent():
             "• Temel ayarların yapılması\n"
             "• Hızlı başlangıç rehberi\n"
             "• İlk kullanım hazırlığı\n"
+            "• Garanti süresi ve kapsamı\n"
+            "• Yetkili servis bilgileri\n"
+            "• Bakım ve temizlik rehberi\n"
+            "• Enerji tüketimi ve verimlilik\n"
+            "• Aksesuar ve yedek parça bilgileri\n"
             "• Güvenlik önlemleri (sadece kurulum sırasında)\n\n"
             
             "PDF'DEN ÇIKARTACAĞIN BİLGİLER:\n"
@@ -51,5 +56,5 @@ def create_quickstart_agent():
         llm=llm,
         verbose=True,
         allow_delegation=False,
-        max_iter=2
+        max_iter=3
     )

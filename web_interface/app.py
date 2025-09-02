@@ -183,27 +183,26 @@ def handle_message(data):
         
         print(f"🤖 Agent system'e gönderiliyor...")
         
-        # Agent'a gönder ve cevap al (session-specific) - TIMEOUT EKLENDI
-        import signal
+        # Agent'a gönder ve cevap al (session-specific) - SIMPLE TIMEOUT
+        from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
+        import time
         
-        def timeout_handler(signum, frame):
-            raise TimeoutError("Agent işlemi zaman aşımına uğradı")
-        
-        # 3 dakika timeout (180 saniye)
-        signal.signal(signal.SIGALRM, timeout_handler)
-        signal.alarm(180)
+        def run_agent_query():
+            return agent_system.process_query(user_message, session_id)
         
         try:
-            response = agent_system.process_query(user_message, session_id)
-            print(f"✅ Agent cevabı alındı: '{response[:100]}...'")
-        except TimeoutError:
-            response = "⏱️ İşlem çok uzun sürdü. Lütfen sorunuzu daha basit bir şekilde tekrar sorun veya daha sonra tekrar deneyin."
-            print("⏱️ Agent işlemi timeout'a uğradı")
+            # ThreadPool ile timeout kontrol et
+            with ThreadPoolExecutor() as executor:
+                future = executor.submit(run_agent_query)
+                try:
+                    response = future.result(timeout=45)  # 45 saniye timeout - çok kısa
+                    print(f"✅ Agent cevabı alındı: '{response[:100]}...'")
+                except FutureTimeoutError:
+                    response = "⏱️ İşlem çok uzun sürdü. Lütfen sorunuzu daha basit bir şekilde tekrar sorun veya daha sonra tekrar deneyin."
+                    print("⏱️ Agent işlemi timeout'a uğradı")
         except Exception as agent_error:
-            response = f"🤖 Agent işleminde hata oluştu. Lütfen tekrar deneyin. (Hata: {str(agent_error)[:100]})"
+            response = f"🚫 Sistem hatası: {str(agent_error)}. Lütfen tekrar deneyin."
             print(f"❌ Agent hatası: {str(agent_error)}")
-        finally:
-            signal.alarm(0)  # Timeout'u iptal et
         
         # Agent cevabını kaydet
         session_manager.add_message(session_id, 'assistant', response)

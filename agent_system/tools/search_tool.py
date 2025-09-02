@@ -17,26 +17,56 @@ class VestelProductSearchTool(BaseTool):
     """
 
     def _run(self, query: str) -> str:
-        """Basit ama kapsamlı ürün arama"""
+        """Gelişmiş esnek ürün arama"""
         try:
             conn = sqlite3.connect(PRODUCTS_DATABASE_PATH)
             cursor = conn.cursor()
             
-            # Geniş arama - hem keywords hem de desc alanlarında ara
-            search_query = f"%{query.lower()}%"
+            # Arama terimlerini kelimelere ayır ve temizle
+            search_terms = [term.strip().lower() for term in query.lower().split() if len(term) > 1]
             
-            sql = """
+            if not search_terms:
+                return f"'{query}' için geçerli arama terimi bulunamadı."
+            
+            # Her kelime için LIKE koşulu oluştur
+            conditions = []
+            params = []
+            
+            for term in search_terms:
+                term_pattern = f"%{term}%"
+                conditions.append("""
+                    (LOWER(name) LIKE ? 
+                     OR LOWER(model_number) LIKE ?
+                     OR LOWER(manual_keywords) LIKE ?
+                     OR LOWER(manual_desc) LIKE ?)
+                """)
+                params.extend([term_pattern, term_pattern, term_pattern, term_pattern])
+            
+            # Tüm kelimelerin bulunduğu ürünleri ara (AND mantığı)
+            sql = f"""
             SELECT model_number, name, manual_keywords, manual_desc
             FROM products 
-            WHERE LOWER(name) LIKE ? 
-               OR LOWER(model_number) LIKE ?
-               OR LOWER(manual_keywords) LIKE ?
-               OR LOWER(manual_desc) LIKE ?
+            WHERE {' AND '.join(conditions)}
             LIMIT 20
             """
             
-            cursor.execute(sql, (search_query, search_query, search_query, search_query))
+            cursor.execute(sql, params)
             results = cursor.fetchall()
+            
+            # Eğer tüm kelimelerle bulamazsa, en az yarısını içeren ürünleri ara
+            if not results and len(search_terms) > 1:
+                half_conditions = conditions[:max(1, len(conditions)//2)]
+                half_params = params[:len(half_conditions)*4]
+                
+                sql = f"""
+                SELECT model_number, name, manual_keywords, manual_desc
+                FROM products 
+                WHERE {' AND '.join(half_conditions)}
+                LIMIT 20
+                """
+                
+                cursor.execute(sql, half_params)
+                results = cursor.fetchall()
             
             conn.close()
             
