@@ -18,29 +18,7 @@ def create_routing_task(user_query: str, routing_agent, session_id: str = None) 
         context_info += f"\n🎯 ÜRÜN REFERANSI: Kullanıcı muhtemelen '{last_product}' ürününden bahsediyor.\n"
     
     return Task(
-        description=(
-            f"Kullanıcının şu isteğini analiz et: '{user_query}'\n\n"
-            f"{context_info}\n\n"
-            "🎯 KARAR VERİRKEN ÖNCELIK SIRASI:\n"
-            "1. Belirli ÜRÜN MODELİ içeriyorsa → Product Search Agent (örn: 'AD-6001 X')\n"
-            "2. 'nasıl kullanılır', 'kurulum adımları' → PDF Agent\n"
-            "3. 'çalışmıyor', 'sorun var' → Technical Support Agent\n"
-            "4. Satın alma niyeti veya garanti/servis → Quickstart Agent\n\n"
-            "⚠️ ÖNEMLİ: '[ÜRÜN MODELİ] nasıl' sorusunda ÖNCELİKLE Product Search yap!\n"
-            "Model ismi varsa o ürün hakkında detaylı bilgi ver, sonra ihtiyaçta PDF'e yönlendir.\n\n"
-            "🔄 DELEGATION KURALLARI:\n"
-            "- 'Ayrıntılı bilgi' istenirse → PDF Agent'a delegate et\n"
-            "- 'Daha fazla bilgi' istenirse → PDF Agent'a delegate et\n"
-            "- 'Nasıl kullanılır' istenirse → PDF Agent'a delegate et\n"
-            "- HİÇBİR AÇIKLAMA YAPMA, SADECE DELEGATE ET!\n\n"
-            "SATIN ALMA BELİRTİLERİ:\n"
-            "- 'alayım', 'satın alma', 'satın al', 'fiyat', 'ne kadar'\n"
-            "- 'nereden alabilirim', 'mağaza', 'kurulum', 'teslimat'\n\n"
-            "ÖNEMLİ KURALLAR:\n"
-            "- Kullanıcı 'bu', 'bu ürün', 'bunu' derse context'teki son ürünü kullan\n"
-            "- Database'den gelen ürünleri listele\n"
-            "- Kullanıcının ihtiyacına göre uygun ve yeterli bilgi ver"
-        ),
+        description=f"Kullanıcının şu isteğini analiz et: '{user_query}'\n\n{context_info}",
         expected_output="Kullanıcının ihtiyacına uygun yanıt",
         agent=routing_agent
     )
@@ -70,9 +48,48 @@ def create_quickstart_task(product_name: str, quickstart_agent) -> Task:
     """Quickstart görevi"""
     return Task(
         description=(
-            f"'{product_name}' ürünü için hızlı başlangıç rehberi oluştur.\n"
-            "Kurulum, ilk kullanım, önemli ipuçları dahil et."
+            f"'{product_name}' ürünü için hızlı başlangıç ve genel bilgileri sun.\n\n"
+            "İÇERİK:\n"
+            "• Kutu açılışı ve ilk kurulum\n"
+            "• Temel kullanım ipuçları\n"
+            "• Önemli güvenlik uyarıları\n"
+            "• Garanti bilgileri\n"
+            "• Temizlik ve bakım\n"
+            "• Yaygın sorunlar ve çözümler\n\n"
+            "AMAÇ: Kullanıcının ürünü güvenli ve etkili şekilde kullanmaya başlamasını sağla."
         ),
-        expected_output="Hızlı başlangıç rehberi",
+        expected_output="Hızlı başlangıç kılavuzu ve genel bilgiler",
         agent=quickstart_agent
+    )
+
+def create_technical_support_task(user_query: str, product_name: str, technical_agent) -> Task:
+    """Teknik destek görevi"""
+    return Task(
+        description=(
+            f"'{product_name}' ürünü için şu teknik sorunu çöz: '{user_query}'\n\n"
+            "YAKLAŞIM:\n"
+            "1. Sorunu analiz et ve olası nedenleri belirle\n"
+            "2. Adım adım çözüm önerileri sun\n"
+            "3. Güvenlik uyarılarını dahil et\n"
+            "4. Profesyonel servis gerekliliğini değerlendir\n\n"
+            "ODAK: Kullanıcının sorunu güvenli ve etkili şekilde çözmesi."
+        ),
+        expected_output="Teknik sorun analizi ve çözüm önerileri",
+        agent=technical_agent
+    )
+
+def create_product_search_task(user_query: str, product_agent) -> Task:
+    """Ürün arama görevi"""
+    return Task(
+        description=(
+            f"Şu ürün aramasını gerçekleştir: '{user_query}'\n\n"
+            "ARAMA STRATEJİSİ:\n"
+            "• Akıllı anahtar kelime seçimi yap\n"
+            "• Veritabanından en uygun ürünleri bul\n"
+            "• Sonuçları kullanıcı dostu şekilde düzenle\n"
+            "• Karşılaştırma imkanı sun\n\n"
+            "HEDEF: Kullanıcının ihtiyacına en uygun ürün seçeneklerini sun."
+        ),
+        expected_output="Ürün arama sonuçları ve öneriler",
+        agent=product_agent
     )

@@ -391,6 +391,21 @@ function showTyping(show) {
     }
 }
 
+// Progress indicator with step-by-step feedback
+function updateTypingIndicatorWithProgress(step, message) {
+    if (typingIndicator) {
+        typingIndicator.style.display = 'block';
+        
+        // Progress mesajını güncelle
+        const progressText = typingIndicator.querySelector('small');
+        if (progressText) {
+            progressText.innerHTML = `<i class="fas fa-cog fa-spin"></i> ${message}`;
+        }
+        
+        scrollToBottom();
+    }
+}
+
 // Session Management Functions
 function loadSessionList() {
     console.log('🔄 Loading session list...');
@@ -732,6 +747,11 @@ socket.on('message_status', function(data) {
 
 socket.on('typing', function(data) {
     showTyping(data.status);
+});
+
+// Progress update handler - Kullanıcıya işlem durumu hakkında bilgi verir
+socket.on('progress_update', function(data) {
+    updateTypingIndicatorWithProgress(data.step, data.message);
 });
 
 socket.on('message_response', function(data) {

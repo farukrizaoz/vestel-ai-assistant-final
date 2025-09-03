@@ -29,6 +29,10 @@ print("📂 Paths configured")
 # --- LLM Ayarları ---
 GEMINI_MODEL = "gemini/gemini-2.5-flash"
 
+from langchain_google_genai import ChatGoogleGenerativeAI
+llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY, temperature=0.0)
+
+
 # --- Memory Sistem Ayarları ---
 # CrewAI memory için ayrı bir API key gerekebilir, aynı API key'i kullanmayı dene
 MEMORY_API_KEY = GOOGLE_API_KEY  # Aynı API key'i kullan

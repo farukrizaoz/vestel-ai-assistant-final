@@ -183,7 +183,7 @@ def handle_message(data):
         
         print(f"🤖 Agent system'e gönderiliyor...")
         
-        # Agent'a gönder ve cevap al (session-specific) - SIMPLE TIMEOUT
+        # Agent'a gönder ve cevap al (session-specific) - CLEAN TIMEOUT
         from concurrent.futures import ThreadPoolExecutor, TimeoutError as FutureTimeoutError
         import time
         
@@ -195,11 +195,11 @@ def handle_message(data):
             with ThreadPoolExecutor() as executor:
                 future = executor.submit(run_agent_query)
                 try:
-                    response = future.result(timeout=45)  # 45 saniye timeout - çok kısa
+                    response = future.result(timeout=120)  # 2 dakika timeout
                     print(f"✅ Agent cevabı alındı: '{response[:100]}...'")
                 except FutureTimeoutError:
-                    response = "⏱️ İşlem çok uzun sürdü. Lütfen sorunuzu daha basit bir şekilde tekrar sorun veya daha sonra tekrar deneyin."
-                    print("⏱️ Agent işlemi timeout'a uğradı")
+                    response = "⏱️ İşlem 2 dakikadan uzun sürdü. Tool validation sorunları olabilir. Lütfen sorunuzu tekrar deneyin."
+                    print("⏱️ Agent işlemi 120s timeout'a uğradı")
         except Exception as agent_error:
             response = f"🚫 Sistem hatası: {str(agent_error)}. Lütfen tekrar deneyin."
             print(f"❌ Agent hatası: {str(agent_error)}")

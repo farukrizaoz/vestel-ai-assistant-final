@@ -4,8 +4,14 @@ Agent karar versin, biz sadece ham veri sağlayalım
 """
 
 import sqlite3
+from pydantic import BaseModel, Field
 from crewai.tools import BaseTool
 from agent_system.config import PRODUCTS_DATABASE_PATH
+
+
+class VestelProductSearchToolInput(BaseModel):
+    """Input schema for Vestel Product Search Tool"""
+    query: str = Field(description="Aranacak ürün veya özellik")
 
 
 class VestelProductSearchTool(BaseTool):
@@ -15,6 +21,7 @@ class VestelProductSearchTool(BaseTool):
     Keywords ve description alanlarından ürün bilgilerini döndürür.
     Agent kendisi hangi ürünlerin uygun olduğuna karar verir.
     """
+    args_schema = VestelProductSearchToolInput
 
     def _run(self, query: str) -> str:
         """Gelişmiş esnek ürün arama"""
@@ -47,7 +54,7 @@ class VestelProductSearchTool(BaseTool):
             SELECT model_number, name, manual_keywords, manual_desc
             FROM products 
             WHERE {' AND '.join(conditions)}
-            LIMIT 20
+            LIMIT 50
             """
             
             cursor.execute(sql, params)
@@ -62,7 +69,7 @@ class VestelProductSearchTool(BaseTool):
                 SELECT model_number, name, manual_keywords, manual_desc
                 FROM products 
                 WHERE {' AND '.join(half_conditions)}
-                LIMIT 20
+                LIMIT 50
                 """
                 
                 cursor.execute(sql, half_params)
