@@ -41,13 +41,13 @@ class VestelCategoryTool(BaseTool):
             cursor = conn.cursor()
             
             # Tüm ürünleri al ve kategorilere ayır
-            sql = "SELECT model_number, name, manual_keywords, manual_desc FROM products"
+            sql = "SELECT model_number, name, manual_keywords, manual_desc, url FROM products"
             cursor.execute(sql)
             results = cursor.fetchall()
             
             # Kategorileri çıkar
             categories = {}
-            for model, name, keywords, desc in results:
+            for model, name, keywords, desc, url in results:
                 if keywords:
                     import re
                     category_match = re.search(r'Ürün [Tt]ipi:\s*([^,\n]+)', keywords)
@@ -56,7 +56,7 @@ class VestelCategoryTool(BaseTool):
                         cat_name = ' '.join(cat_name.split())  # Normalize et
                         if cat_name not in categories:
                             categories[cat_name] = []
-                        categories[cat_name].append((model, name, keywords, desc))
+                        categories[cat_name].append((model, name, keywords, desc, url))
             
             conn.close()
             
@@ -72,7 +72,7 @@ class VestelCategoryTool(BaseTool):
                     for i, (cat_name, products) in enumerate(sorted_categories.items(), 1):
                         output += f"{i}. **{cat_name}** ({len(products)} ürün)\n"
                         # İlk 2 ürünü örnek olarak göster
-                        for j, (model, name, keywords, desc) in enumerate(products[:2], 1):
+                        for j, (model, name, keywords, desc, url) in enumerate(products[:2], 1):
                             output += f"   {j}. {model} - {name[:50]}{'...' if len(name) > 50 else ''}\n"
                         if len(products) > 2:
                             output += f"   ... ve {len(products)-2} ürün daha\n"
@@ -105,14 +105,14 @@ class VestelCategoryTool(BaseTool):
                 if not found_products:
                     feature_matches = {}
                     for cat_name, products in categories.items():
-                        for model, name, keywords, desc in products:
+                        for model, name, keywords, desc, url in products:
                             # Ürün adında, özelliklerinde veya açıklamasında ara
                             if (keywords and search_term in keywords.lower()) or \
                                (name and search_term in name.lower()) or \
                                (desc and search_term in desc.lower()):
                                 if cat_name not in feature_matches:
                                     feature_matches[cat_name] = []
-                                feature_matches[cat_name].append((model, name, keywords, desc))
+                                feature_matches[cat_name].append((model, name, keywords, desc, url))
                     
                     if feature_matches:
                         # Özellik eşleşmelerini birleştir
@@ -145,13 +145,17 @@ class VestelCategoryTool(BaseTool):
                     # Bulunan ürünleri detaylı listele
                     output = f"🎯 **{matched_category.upper()}** ({len(found_products)} ürün bulundu)\n\n"
                     
-                    for i, (model, name, keywords, desc) in enumerate(found_products, 1):
+                    for i, (model, name, keywords, desc, url) in enumerate(found_products, 1):
                         output += f"{i}. **{model}** - {name}\n"
+                        if url:
+                            output += f"   🔗 {url}\n"
                         if keywords:
                             # Önemli özellikleri çıkar
                             features = keywords[:150] + "..." if len(keywords) > 150 else keywords
                             output += f"   🔧 {features}\n"
                         output += "\n"
+                    
+                    output += "\n📌 NOT: Fiyat sorgusu için URL'si olan ürünlerde 'Vestel Fiyat ve Stok Sorgulama' tool'unu kullanabilirsin."
                     
                     return output
                 else:

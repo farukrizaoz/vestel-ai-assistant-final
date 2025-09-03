@@ -30,6 +30,9 @@ const messageCountDisplay = document.getElementById('message-count');
 const lastActivityDisplay = document.getElementById('last-activity');
 const sessionSidebar = document.getElementById('session-sidebar');
 const currentSessionDisplay = document.getElementById('current-session-display');
+const sessionDropdown = document.getElementById('session-dropdown');
+const sessionList = document.getElementById('session-list');
+const currentSessionName = currentSessionDisplay;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -83,8 +86,10 @@ function setupEventListeners() {
     // New chat button
     newChatBtn.addEventListener('click', startNewChat);
     
-    // Session dropdown events
-    sessionDropdown.addEventListener('click', loadSessionList);
+    // Session dropdown events (optional)
+    if (sessionDropdown) {
+        sessionDropdown.addEventListener('click', loadSessionList);
+    }
     
     // Session management buttons
     const newSessionBtn = document.getElementById('new-session-btn');
@@ -266,13 +271,13 @@ function startNewChat() {
             if (data.success) {
                 currentSessionId = data.session_id;
                 initializeChat();
-                currentSessionName.textContent = `Yeni Chat ${data.session_id.substring(0, 8)}`;
-                
+                updateSessionDisplay();
+
                 // Update URL
                 const newUrl = new URL(window.location);
                 newUrl.searchParams.set('session', data.session_id);
                 window.history.pushState({}, '', newUrl);
-                
+
                 loadSessionList();
             }
         })
@@ -516,11 +521,19 @@ function deleteSession(sessionId) {
 function loadSession(sessionId) {
     // Session değişiyor, her durumda yükle
     console.log(`🔄 Session yükleniyor: ${sessionId}`);
-    
+
     currentSessionId = sessionId;
+
+    // Sunucuya aktif session değişimini bildir
+    fetch(`/api/session/${sessionId}/switch`, { method: 'POST' })
+        .catch(error => console.error('Session switch error:', error));
+
     loadSessionHistory(sessionId);
     renderSessionSidebar(); // Aktif session'ı güncelle
     updateSessionDisplay();
+
+    // Session listesi güncellensin
+    loadSessionList();
 }
 
 function clearCurrentChat() {
@@ -556,7 +569,7 @@ function deleteCurrentSession() {
         return;
     }
     
-    const sessionName = currentSessionName.textContent || currentSessionId.substring(0, 8);
+    const sessionName = currentSessionDisplay ? currentSessionDisplay.textContent : currentSessionId.substring(0, 8);
     
     if (confirm(`"${sessionName}" session'ını tamamen silmek istediğinizden emin misiniz?\n\nBu işlem geri alınamaz!`)) {
         fetch(`/api/session/${currentSessionId}/delete`, { method: 'DELETE' })
@@ -619,10 +632,10 @@ function renderSessionDropdown() {
 
 function switchToSession(sessionId, sessionName) {
     if (sessionId === currentSessionId) return;
-    
+
     currentSessionId = sessionId;
-    if (currentSessionName) {
-        currentSessionName.textContent = sessionName;
+    if (currentSessionDisplay) {
+        currentSessionDisplay.textContent = sessionName;
     }
     
     loadSessionHistory(sessionId);

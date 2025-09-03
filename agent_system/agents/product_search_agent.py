@@ -4,7 +4,7 @@ Product Search Agent - Ürün arama ve öneri uzmanı
 
 from crewai import Agent, LLM
 from agent_system.config import GOOGLE_API_KEY
-from agent_system.tools import ImprovedProductSearchTool, VestelCategorySearchTool
+from agent_system.tools import ImprovedProductSearchTool, VestelCategorySearchTool, VestelPriceStockTool
 
 # LLM instance
 llm = LLM(
@@ -31,7 +31,10 @@ def create_product_search_agent():
             "  - İlk adım: category='list' ile tüm kategorileri göster\n"
             "  - İkinci adım: category='spesifik_kategori' ile nokta atışı\n"
             "• **ÖNERİ/KARŞILAŞTIRMA** → Vestel Ürün Arama\n"
-            "  - Sadece öneri/karşılaştırma istekleri için\n\n"
+            "  - Sadece öneri/karşılaştırma istekleri için\n"
+            "• **FİYAT/STOK SORGULAMA** → Vestel Fiyat ve Stok Sorgulama\n"
+            "  - 'kaç para', 'fiyat', 'stok' kelimeleri için\n"
+            "  - Vestel.com.tr URL'i gerekli\n\n"
             
             "🔄 **ÇALIŞMA AKIŞIN:**\n"
             "1. Kullanıcı kategori/liste isterse:\n"
@@ -43,6 +46,11 @@ def create_product_search_agent():
             "2. Kullanıcı öneri isterse:\n"
             "   → Direkt Ürün Arama kullan\n\n"
             
+            "3. Kullanıcı FİYAT/STOK sorarsa:\n"
+            "   → Önce ürünü bul (Ürün Arama ile)\n"
+            "   → Eğer Vestel.com.tr URL'i varsa → Fiyat ve Stok tool'unu kullan\n"
+            "   → Yoksa → vestel.com.tr'ye yönlendir\n\n"
+            
             "📝 **ÖRNEKLER:**\n"
             "❓ 'no frost buzdolapları listele'\n"
             "1️⃣ category='list' → kategorileri gör\n"
@@ -51,10 +59,15 @@ def create_product_search_agent():
             "❓ 'hangi buzdolabını önerirsin'\n"
             "→ Direkt Ürün Arama kullan\n\n"
             
+            "❓ 'Vestel 85Q9900 kaç para' / 'fiyatı nedir'\n"
+            "1️⃣ Önce ürünü bul (Ürün Arama ile)\n"
+            "2️⃣ Eğer URL varsa → Fiyat Stok tool'u kullan\n"
+            "3️⃣ Yoksa → vestel.com.tr'ye yönlendir\n\n"
+            
             "💡 **HER ZAMAN İKİ TOOL ÇAĞRISI YAP kategorik isteklerde!**\n"
             "Bu sayede doğru kategoriyi bulup tam sonuç verirsin.\n"
         ),
-        tools=[ImprovedProductSearchTool(), VestelCategorySearchTool()],
+        tools=[ImprovedProductSearchTool(), VestelCategorySearchTool(), VestelPriceStockTool()],
         llm=llm,
         verbose=True,
         allow_delegation=False,

@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, session
+from flask import Flask, render_template, request, jsonify, g
 from flask_socketio import SocketIO, emit
 import sys
 import os
@@ -10,15 +10,11 @@ import json
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from agent_system.main import VestelAgentSystem
-from agent_system.state_manager import ConversationManager, get_conversation_manager, hydrate_sessions_from_disk
+from agent_system.state_manager import get_conversation_manager, hydrate_sessions_from_disk
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'vestel-agent-secret-key-2025'
 socketio = SocketIO(app, cors_allowed_origins="*")
-
-# Global variables
-agent_system = VestelAgentSystem()
-conversation_manager = ConversationManager()
 
 # UYGULAMA BAŞLANGICINDA HYDRATE ET
 try:
@@ -33,7 +29,7 @@ def index():
     """Ana sayfa - Chat arayüzü"""
     try:
         hydrate_sessions_from_disk()  # HYDRATE ET
-        sessions = conversation_manager.list_sessions()
+        sessions = get_conversation_manager().list_sessions()
         sorted_sessions = sorted(sessions, 
                                  key=lambda x: x.get('last_activity', '1970-01-01T00:00:00'), 
                                  reverse=True)
@@ -42,21 +38,30 @@ def index():
             # En son aktif olan session'ı seç
             latest_session_id = sorted_sessions[0].get('session_id')
             print(f"🎯 Varsayılan session seçildi: {latest_session_id}")
-            return render_template('index.html', 
-                                   session_id=latest_session_id, 
-                                   sessions=sorted_sessions)
+            return render_template(
+                'index.html',
+                session_id=latest_session_id,
+                sessions=sorted_sessions,
+                existing_session=True
+            )
         else:
             # Hiç session yoksa, boş bir sayfa göster
             print("🚫 Hiç session bulunamadı. Boş başlangıç sayfası gösteriliyor.")
-            return render_template('index.html', 
-                                   session_id=None, 
-                                   sessions=[])
+            return render_template(
+                'index.html',
+                session_id=None,
+                sessions=[],
+                existing_session=False
+            )
     except Exception as e:
         print(f"❌ Session yükleme hatası: {e}")
         # Hata durumunda da boş sayfa göster
-        return render_template('index.html', 
-                               session_id=None, 
-                               sessions=[])
+        return render_template(
+            'index.html',
+            session_id=None,
+            sessions=[],
+            existing_session=False
+        )
 
 # Admin route'unu kaldırıyoruz
 # @app.route('/admin')
@@ -70,7 +75,7 @@ def get_sessions():
     """Mevcut session'ları listele - LAST_ACTIVITY'YE GÖRE SIRALI"""
     try:
         hydrate_sessions_from_disk()  # HYDRATE ET
-        sessions = conversation_manager.list_sessions()
+        sessions = get_conversation_manager().list_sessions()
         # Session'ları last_activity'ye göre sırala (en yeni en başta)
         sorted_sessions = sorted(sessions, 
                                key=lambda x: x.get('last_activity', '1970-01-01T00:00:00'), 
@@ -89,11 +94,14 @@ def get_sessions():
 def get_session_details(session_id):
     """Belirli bir session'ın detaylarını getir"""
     try:
+        # Session-specific manager al
+        session_manager = get_conversation_manager(session_id)
+
         # Session history al
-        history = conversation_manager.get_conversation_history(session_id)
-        
+        history = session_manager.get_conversation_history()
+
         # Session dosyası varsa JSON'dan oku
-        session_file = os.path.join(conversation_manager.sessions_dir, f"{session_id}.json")
+        session_file = os.path.join(session_manager.sessions_dir, f"{session_id}.json")
         session_data = {}
         
         if os.path.exists(session_file):
@@ -119,7 +127,8 @@ def get_session_details(session_id):
 def new_chat_session():
     """Yeni chat session başlat"""
     try:
-        session_id = conversation_manager.create_session()
+        session_manager = get_conversation_manager()
+        session_id = session_manager.create_session()
         
         return jsonify({
             'success': True,
@@ -170,7 +179,12 @@ def handle_message(data):
         
         # Session-specific manager al
         session_manager = get_conversation_manager(session_id)
-        
+
+        # Agent system'i session bazlı al
+        if not hasattr(g, 'agent_system') or g.agent_system.session_id != session_id:
+            g.agent_system = VestelAgentSystem(session_id)
+        agent_system = g.agent_system
+
         # Kullanıcı mesajını kaydet
         session_manager.add_message(session_id, 'user', user_message)
         
@@ -253,7 +267,8 @@ def rename_session(session_id):
                 'error': 'Yeni isim boş olamaz'
             })
         
-        success = conversation_manager.rename_session(session_id, new_name)
+        session_manager = get_conversation_manager(session_id)
+        success = session_manager.rename_session(session_id, new_name)
         
         return jsonify({
             'success': success,
@@ -270,7 +285,8 @@ def delete_session(session_id):
     """Session'ı sil"""
     try:
         # JSON dosyasını sil
-        session_file = os.path.join(conversation_manager.sessions_dir, f"{session_id}.json")
+        session_manager = get_conversation_manager(session_id)
+        session_file = os.path.join(session_manager.sessions_dir, f"{session_id}.json")
         if os.path.exists(session_file):
             os.remove(session_file)
         
@@ -292,7 +308,6 @@ def delete_session(session_id):
 def clear_session(session_id):
     """Session'daki mesajları temizle"""
     try:
-        from agent_system.state_manager import get_conversation_manager
         conv_manager = get_conversation_manager(session_id)
         
         # Mesajları temizle
@@ -313,13 +328,10 @@ def clear_session(session_id):
 def switch_session(session_id):
     """Session'a geç"""
     try:
-        global conversation_manager
-        conversation_manager.session_id = session_id
-        conversation_manager.session_file = conversation_manager.sessions_dir / f"{session_id}.json"
-        conversation_manager.load_session()
-        
+        session_manager = get_conversation_manager(session_id)
+
         # Session bilgilerini al
-        session_info = conversation_manager.get_session_info(session_id)
+        session_info = session_manager.get_session_info(session_id)
         
         return jsonify({
             'success': True,
@@ -338,7 +350,8 @@ def handle_session_info(data):
     try:
         session_id = data.get('session_id', '')
         if session_id:
-            history = conversation_manager.get_conversation_history(session_id)
+            session_manager = get_conversation_manager(session_id)
+            history = session_manager.get_conversation_history()
             emit('session_info', {
                 'session_id': session_id,
                 'message_count': len(history),
