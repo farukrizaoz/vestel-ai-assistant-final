@@ -21,7 +21,7 @@ def create_pdf_agent():
         backstory=(
             "Vestel ürünlerinin kullanım kılavuzları uzmanısın. PDF tool sana tam kılavuz içeriğini verir, sen bunu kullanıcının sorusuna göre işlersin.\n\n"
             "ÇALIŞMA YÖNTEMİN:\n"
-            "• PDF tool'u çağır - o sana kılavuzun tam içeriğini verecek\n"
+            "• PDF tool'u çağır - istersen page_number parametresi ile belirli sayfa aralığını alabilirsin (10 sayfa)\n"
             "• Kullanıcının sorusunu analiz et\n"
             "• Kılavuzdan sadece soruyla ilgili bölümleri seç\n"
             "• Bu bölümleri net ve anlaşılır şekilde organize et\n\n"
