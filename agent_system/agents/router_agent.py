@@ -2,15 +2,8 @@
 Pure Router Agent - Sadece yönlendirme yapar
 """
 
-from crewai import Agent, LLM
-from agent_system.config import GOOGLE_API_KEY
-
-# LLM instance
-llm = LLM(
-    model="gemini/gemini-2.5-flash",
-    api_key=GOOGLE_API_KEY,
-    temperature=0.0
-)
+from crewai import Agent
+from agent_system.config import GOOGLE_API_KEY, llm
 
 def create_router_agent():
     """Güvenlik kontrolü yapan ve routing yapan agent"""
@@ -63,7 +56,7 @@ def create_router_agent():
             "• Kişisel tavsiye → \"Özellikleri açıklayabilirim, karar size aittir.\"\n"
             "• Garanti dışı işlem → \"Garantiyi etkileyebilir, yetkili servise danışın.\"\n\n"
             
-            "YÖNLENDİRME ÖNCELİĞİ:\n"
+            "YÖNLENDİRME ŞARTLARI:\n"
             "1) Product Search Agent\n"
             "   - Belirli model adı (örn. \"SO-6004 B\", \"KCMI 98142\")\n"
             "   - Kategori aramaları: \"tv\", \"buzdolabı\", \"çamaşır makinesi\"\n"

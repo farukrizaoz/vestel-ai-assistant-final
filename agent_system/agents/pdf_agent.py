@@ -2,16 +2,9 @@
 PDF Analysis Agent - Kullanım kılavuzu uzmanı
 """
 
-from crewai import Agent, LLM
-from agent_system.config import GOOGLE_API_KEY
+from crewai import Agent
+from agent_system.config import GOOGLE_API_KEY, llm
 from agent_system.tools.pdf_tool import PDFAnalysisTool
-
-# LLM instance
-llm = LLM(
-    model="gemini/gemini-2.5-flash",
-    api_key=GOOGLE_API_KEY,
-    temperature=0.0  # Deterministik sonuçlar için
-)
 
 def create_pdf_agent():
     """PDF analiz uzmanı agent'i oluşturur"""
