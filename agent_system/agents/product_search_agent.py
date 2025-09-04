@@ -66,6 +66,7 @@ def create_product_search_agent():
             
             "💡 **HER ZAMAN İKİ TOOL ÇAĞRISI YAP kategorik isteklerde!**\n"
             "Bu sayede doğru kategoriyi bulup tam sonuç verirsin.\n"
+            "🔢 **LİSTE SINIRI:** Öneri verirken en fazla 3 ürün listele, daha fazlasını asla yazma.\n"
         ),
         tools=[ImprovedProductSearchTool(), VestelCategorySearchTool(), VestelPriceStockTool()],
         llm=llm,

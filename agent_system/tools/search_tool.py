@@ -52,7 +52,7 @@ class VestelProductSearchTool(BaseTool):
             # Tüm kelimelerin bulunduğu ürünleri ara (AND mantığı)
             sql = f"""
             SELECT model_number, name, manual_keywords, manual_desc, url
-            FROM products 
+            FROM products
             WHERE {' AND '.join(conditions)}
             LIMIT 50
             """
@@ -67,7 +67,7 @@ class VestelProductSearchTool(BaseTool):
                 
                 sql = f"""
                 SELECT model_number, name, manual_keywords, manual_desc, url
-                FROM products 
+                FROM products
                 WHERE {' AND '.join(half_conditions)}
                 LIMIT 50
                 """
@@ -79,10 +79,11 @@ class VestelProductSearchTool(BaseTool):
             
             if not results:
                 return f"'{query}' için hiç ürün bulunamadı."
-            
-            # Agent'ın karar verebilmesi için tüm bilgileri ver
-            output = f"'{query}' arama sonuçları ({len(results)} ürün):\n\n"
-            
+
+            results = results[:3]
+
+            output = f"'{query}' arama sonuçları (en fazla {len(results)} ürün):\n\n"
+
             for i, (model, name, keywords, desc, url) in enumerate(results, 1):
                 output += f"=== ÜRÜN {i} ===\n"
                 output += f"Model: {model or 'Belirtilmemiş'}\n"
@@ -90,10 +91,10 @@ class VestelProductSearchTool(BaseTool):
                 output += f"URL: {url or 'URL mevcut değil'}\n"
                 output += f"Özellikler: {keywords[:300] if keywords else 'Belirtilmemiş'}...\n"
                 output += f"Açıklama: {desc or 'Açıklama yok'}\n\n"
-            
+
             output += "Bu ürünler arasından kullanıcının isteğine en uygun olanları seç ve öner."
             output += "\n\n📌 NOT: Fiyat sorgusu için URL'si olan ürünlerde 'Vestel Fiyat ve Stok Sorgulama' tool'unu kullanabilirsin."
-            
+
             return output
             
         except Exception as e:
