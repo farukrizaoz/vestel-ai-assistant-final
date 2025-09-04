@@ -11,7 +11,6 @@ import sqlite3
 from typing import List, Tuple, Iterable, Optional
 import PyPDF2
 from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
 
 # OCR için gerekli import'lar
 try:
@@ -111,15 +110,12 @@ def page_text_hybrid(reader: PyPDF2.PdfReader, pdf_path: Path, idx: int,
     return (t, False)
 
 def iter_pdf_text_stream(pdf_path: Path,
-                         start_page: int = 1,
-                         end_page: Optional[int] = None,
                          max_seconds: Optional[int] = None,
                          ocr_dpi: int = 140,
                          ocr_if_needed: bool = True,
                          progress_cb: Optional[callable] = None) -> Iterable[str]:
     """
     Uzun PDF'lerde bile sayfa sayfa, hafıza-dostu metin üretir.
-    - Belirli sayfa aralığını okuyabilir.
     - Zaman sınırı aşılırsa durur.
     - Her sayfada PYPDF2 -> gerekirse OCR.
     - progress_cb(page_index_1based, total_pages, used_ocr: bool, char_count: int) çağrılır.
@@ -134,11 +130,7 @@ def iter_pdf_text_stream(pdf_path: Path,
                 raise RuntimeError("PDF şifreli ve açılamadı")
 
         total = len(reader.pages)
-        start_idx = max(start_page - 1, 0)
-        end_idx = end_page - 1 if end_page else total - 1
-        end_idx = min(end_idx, total - 1)
-
-        for i in range(start_idx, end_idx + 1):
+        for i in range(total):
             if max_seconds and (time.monotonic() - start) > max_seconds:
                 # Kibarca kes
                 yield f"\n\n[⏱️ Zaman sınırı nedeniyle {i}/{total} sayfada duruldu.]"
@@ -162,39 +154,31 @@ def iter_pdf_text_stream(pdf_path: Path,
             yield out
 
 
-def extract_pdf_full_text(pdf_path: Path,
-                          page_number: int = 1,
-                          window: int = 10,
-                          prefer_speed: bool = True) -> str:
+def extract_pdf_full_text(pdf_path: Path, prefer_speed: bool = True) -> str:
     """
-    İstenen sayfa etrafında belirli bir aralıktaki metni çıkarır.
-    Varsayılan olarak 10 sayfalık bir pencere döndürür.
+    Uzun PDF'ler için tam metin çıkarır - ÇOK HIZLI MOD
     """
     # Çok agresif limitler - hız öncelikli
     ocr_dpi = 120  # Düşük DPI
     max_secs = 30   # 30 saniye hard limit
-
-    start_page = max(page_number - 5, 1)
-    end_page = start_page + window - 1
+    max_pages_to_process = 15  # Maksimum 15 sayfa
 
     used_any_ocr = {"flag": False}
-    processed_pages = {"last": start_page - 1}
+    processed_pages = {"count": 0}
 
     def progress(page_i, total, used_ocr, nchar):
         if used_ocr:
             used_any_ocr["flag"] = True
-        processed_pages["last"] = page_i
-        if page_i % 3 == 0 or used_ocr:
-            print(f"⚡ [{page_i}/{total}] {'🔍' if used_ocr else '📝'} {nchar}ch")
+        processed_pages["count"] = page_i
+        if page_i % 3 == 0 or used_ocr:  # Daha sık log
+            print(f"⚡ [{page_i}/{min(total, max_pages_to_process)}] {'🔍' if used_ocr else '📝'} {nchar}ch")
 
     parts = []
     total_chars = 0
     page_count = 0
-
+    
     for chunk in iter_pdf_text_stream(
         pdf_path=pdf_path,
-        start_page=start_page,
-        end_page=end_page,
         max_seconds=max_secs,
         ocr_dpi=ocr_dpi,
         ocr_if_needed=True,
@@ -203,21 +187,28 @@ def extract_pdf_full_text(pdf_path: Path,
         parts.append(chunk)
         total_chars += len(chunk)
         page_count += 1
-
+        
+        # Sayfa limiti kontrolü
+        if page_count >= max_pages_to_process:
+            parts.append(f"\n\n[⚡ Hız için {max_pages_to_process} sayfada duruldu.]")
+            break
+            
+        # Memory protection - daha agresif
         if total_chars > MAX_TEXT_LENGTH:
-            parts.append("\n\n[⚡ Hız için içerik kısaltıldı.]")
+            parts.append(f"\n\n[⚡ Hız için içerik kısaltıldı.]")
             break
 
     body = "\n".join(parts).strip()
-
+    
+    # Final truncation - daha kısa
     if len(body) > MAX_TEXT_LENGTH:
         body = body[:MAX_TEXT_LENGTH] + "\n\n[⚡ Hız için kısaltıldı.]"
-
-    header = f"⚡ {pdf_path.name} - Sayfa {start_page}-{processed_pages['last']}"
+    
+    header = f"⚡ {pdf_path.name} - Hızlı Analiz"
     if used_any_ocr["flag"]:
         header += " [🔍 OCR]"
-    header += f" ({page_count} sayfa)"
-
+    header += f" ({processed_pages['count']} sayfa)"
+    
     return f"{header}\n\n{body}"
 
 
@@ -241,18 +232,12 @@ def _score_match(product_text: str, terms: List[str]) -> int:
 
 class PDFAnalysisTool(BaseTool):
     name: str = "PDF Kılavuz Analizi"
-    description: str = "Belirtilen ürünün PDF kılavuzunu bulur ve istenen sayfa aralığının içeriğini döndürür (DB'deki manual_path'e göre)."
+    description: str = "Belirtilen ürünün PDF kılavuzunu bulur ve içeriğini döndürür (DB'deki manual_path'e göre)."
 
-    class PDFToolInput(BaseModel):
-        product_name: str = Field(description="Ürün adı veya modeli")
-        page_number: int = Field(default=1, description="İstenen sayfa numarası (1-based)")
-
-    args_schema = PDFToolInput
-
-    def _run(self, product_name: str, page_number: int = 1) -> str:
+    def _run(self, product_name: str) -> str:
         """
         Veritabanından manual_path'i güvenli şekilde bulur,
-        PDF'den belirtilen sayfa çevresindeki metni döndürür.
+        PDF'i (gerekirse ilk N sayfa) okur ve metni döndürür.
         """
         try:
             from agent_system.config import PRODUCTS_DATABASE_PATH
@@ -344,7 +329,7 @@ class PDFAnalysisTool(BaseTool):
         # 5) Yeni gelişmiş PDF okuma sistemi
         try:
             print(f"🔍 PDF analiz başlıyor: {matching_pdf}")
-            full_text = extract_pdf_full_text(pdf_path, page_number=page_number, prefer_speed=True)
+            full_text = extract_pdf_full_text(pdf_path, prefer_speed=True)
             
             if full_text:
                 return (
