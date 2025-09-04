@@ -33,6 +33,8 @@ const currentSessionDisplay = document.getElementById('current-session-display')
 const sessionDropdown = document.getElementById('session-dropdown');
 const sessionList = document.getElementById('session-list');
 const currentSessionName = currentSessionDisplay;
+const sidebarContainer = document.getElementById('session-sidebar-container');
+const toggleSidebarBtn = document.getElementById('toggle-sidebar');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -107,7 +109,7 @@ function setupEventListeners() {
     if (deleteSessionBtn) {
         deleteSessionBtn.addEventListener('click', deleteCurrentSession);
     }
-    
+
     // Quick action buttons
     document.querySelectorAll('.quick-action').forEach(btn => {
         btn.addEventListener('click', function() {
@@ -116,6 +118,12 @@ function setupEventListeners() {
             sendMessage();
         });
     });
+
+    if (toggleSidebarBtn && sidebarContainer) {
+        toggleSidebarBtn.addEventListener('click', () => {
+            sidebarContainer.classList.toggle('d-none');
+        });
+    }
 }
 
 function sendMessage() {
@@ -347,8 +355,13 @@ function newSession() {
 
 function updateSessionDisplay() {
     if (currentSessionDisplay && currentSessionId) {
-        const shortId = currentSessionId.substring(0, 8);
-        currentSessionDisplay.textContent = `Session ${shortId}`;
+        const session = sessions.find(s => s.session_id === currentSessionId);
+        if (session && session.session_name) {
+            currentSessionDisplay.textContent = session.session_name;
+        } else {
+            const shortId = currentSessionId.substring(0, 8);
+            currentSessionDisplay.textContent = `Session ${shortId}`;
+        }
     }
 }
 
@@ -462,6 +475,7 @@ function loadSessionList() {
                 sessions = data.sessions;
                 console.log(`✅ ${sessions.length} sessions loaded`);
                 renderSessionSidebar();
+                updateSessionDisplay();
             } else {
                 console.error('❌ Session loading failed:', data.error);
             }
@@ -488,6 +502,7 @@ function renderSessionSidebar() {
     const sessionHTML = sessions.map(session => {
         const isActive = session.session_id === currentSessionId;
         const shortId = session.session_id.substring(0, 8);
+        const sessionName = session.session_name || `Session ${shortId}`;
         const lastActivity = new Date(session.last_activity).toLocaleDateString('tr-TR', {
             day: '2-digit',
             month: '2-digit',
@@ -508,7 +523,7 @@ function renderSessionSidebar() {
                     <div class="flex-grow-1">
                         <div style="font-weight: 600; font-size: 0.9em;" class="mb-1">
                             <i class="fas fa-comments me-1"></i>
-                            Session ${shortId}
+                            ${sessionName}
                         </div>
                         <div style="font-size: 0.75em; opacity: 0.8;" class="mb-1">
                             <i class="fas fa-clock me-1"></i>
@@ -519,18 +534,55 @@ function renderSessionSidebar() {
                             ${session.message_count || 0} mesaj
                         </div>
                     </div>
-                    <button class="btn btn-sm ${isActive ? 'btn-light' : 'btn-outline-danger'}" 
-                            style="padding: 2px 6px; font-size: 0.7em;"
-                            onclick="event.stopPropagation(); deleteSession('${session.session_id}')"
-                            title="Session'ı sil">
-                        <i class="fas fa-trash"></i>
-                    </button>
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-secondary"
+                                style="padding: 2px 6px; font-size: 0.7em;"
+                                onclick="event.stopPropagation(); renameSession('${session.session_id}')"
+                                title="Session adını değiştir">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="btn ${isActive ? 'btn-light' : 'btn-outline-danger'}"
+                                style="padding: 2px 6px; font-size: 0.7em;"
+                                onclick="event.stopPropagation(); deleteSession('${session.session_id}')"
+                                title="Session'ı sil">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
     }).join('');
 
     sessionSidebar.innerHTML = sessionHTML;
+}
+
+function renameSession(sessionId) {
+    const session = sessions.find(s => s.session_id === sessionId);
+    const currentName = session && session.session_name ? session.session_name : `Session ${sessionId.substring(0, 8)}`;
+    const newName = prompt('Yeni session adı:', currentName);
+    if (!newName || !newName.trim()) {
+        return;
+    }
+
+    fetch(`/api/session/${sessionId}/rename`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ new_name: newName.trim() })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            loadSessionList();
+        } else {
+            alert('Session adı değiştirilemedi: ' + (data.error || 'Bilinmeyen hata'));
+        }
+    })
+    .catch(error => {
+        console.error('Session rename error:', error);
+        alert('Session adı değiştirilemedi');
+    });
 }
 
 function deleteSession(sessionId) {
