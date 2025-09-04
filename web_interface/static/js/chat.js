@@ -190,6 +190,7 @@ function disableInput() {
     sendBtn.innerHTML = '<i class="fas fa-hourglass-half"></i>';
     sendBtn.classList.add('btn-secondary');
     sendBtn.classList.remove('btn-primary');
+    disableSessionSwitching();
 }
 
 function enableInput() {
@@ -200,6 +201,37 @@ function enableInput() {
     sendBtn.classList.remove('btn-secondary');
     sendBtn.classList.add('btn-primary');
     messageInput.focus();
+    enableSessionSwitching();
+}
+
+function disableSessionSwitching() {
+    if (sessionSidebar) {
+        sessionSidebar.style.pointerEvents = 'none';
+        sessionSidebar.style.opacity = '0.6';
+    }
+    if (newChatBtn) {
+        newChatBtn.disabled = true;
+    }
+    const newSessionButton = document.getElementById('new-session-btn') ||
+        document.querySelector('button[onclick="newSession()"]');
+    if (newSessionButton) {
+        newSessionButton.disabled = true;
+    }
+}
+
+function enableSessionSwitching() {
+    if (sessionSidebar) {
+        sessionSidebar.style.pointerEvents = 'auto';
+        sessionSidebar.style.opacity = '1';
+    }
+    if (newChatBtn) {
+        newChatBtn.disabled = false;
+    }
+    const newSessionButton = document.getElementById('new-session-btn') ||
+        document.querySelector('button[onclick="newSession()"]');
+    if (newSessionButton) {
+        newSessionButton.disabled = false;
+    }
 }
 
 // Process pending messages when connection is restored
@@ -265,6 +297,10 @@ function formatAssistantMessage(content) {
 }
 
 function startNewChat() {
+    if (isProcessing) {
+        alert('Lütfen yanıt gelene kadar bekleyin.');
+        return;
+    }
     fetch('/api/chat/new', { method: 'POST' })
         .then(response => response.json())
         .then(data => {
@@ -285,6 +321,10 @@ function startNewChat() {
 }
 
 function newSession() {
+    if (isProcessing) {
+        alert('Lütfen yanıt gelene kadar bekleyin.');
+        return;
+    }
     fetch('/api/chat/new', { method: 'POST' })
         .then(response => response.json())
         .then(data => {
@@ -519,6 +559,10 @@ function deleteSession(sessionId) {
 }
 
 function loadSession(sessionId) {
+    if (isProcessing) {
+        alert('Yanıt beklenirken session değiştirilemez.');
+        return;
+    }
     // Session değişiyor, her durumda yükle
     console.log(`🔄 Session yükleniyor: ${sessionId}`);
 
@@ -631,15 +675,19 @@ function renderSessionDropdown() {
 }
 
 function switchToSession(sessionId, sessionName) {
+    if (isProcessing) {
+        alert('Yanıt beklenirken session değiştirilemez.');
+        return;
+    }
     if (sessionId === currentSessionId) return;
 
     currentSessionId = sessionId;
     if (currentSessionDisplay) {
         currentSessionDisplay.textContent = sessionName;
     }
-    
+
     loadSessionHistory(sessionId);
-    
+
     // Update URL
     const newUrl = new URL(window.location);
     newUrl.searchParams.set('session', sessionId);
