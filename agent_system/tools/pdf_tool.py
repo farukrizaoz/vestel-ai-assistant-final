@@ -25,8 +25,8 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # Configuration
-MAX_TEXT_LENGTH = 30000  # Daha kısa limit
-MAX_PROCESSING_TIME = 45  # 45 saniye - çok daha kısa
+MAX_TEXT_LENGTH = 30000  # Çok daha büyük limit - 100K karakter
+MAX_PROCESSING_TIME = 120  # 2 dakika - daha uzun süre
 
 
 # ============== Yardımcılar ==============
@@ -156,12 +156,12 @@ def iter_pdf_text_stream(pdf_path: Path,
 
 def extract_pdf_full_text(pdf_path: Path, prefer_speed: bool = True) -> str:
     """
-    Uzun PDF'ler için tam metin çıkarır - ÇOK HIZLI MOD
+    Uzun PDF'ler için tam metin çıkarır - TÜM SAYFALARI İŞLE
     """
-    # Çok agresif limitler - hız öncelikli
+    # Zaman sınırı kaldırıldı, tüm sayfalar işlenecek
     ocr_dpi = 120  # Düşük DPI
-    max_secs = 30   # 30 saniye hard limit
-    max_pages_to_process = 15  # Maksimum 15 sayfa
+    max_secs = 30   # Zaman sınırı yok
+    max_pages_to_process = 30  # Sayfa sınırı yok
 
     used_any_ocr = {"flag": False}
     processed_pages = {"count": 0}
@@ -170,8 +170,8 @@ def extract_pdf_full_text(pdf_path: Path, prefer_speed: bool = True) -> str:
         if used_ocr:
             used_any_ocr["flag"] = True
         processed_pages["count"] = page_i
-        if page_i % 3 == 0 or used_ocr:  # Daha sık log
-            print(f"⚡ [{page_i}/{min(total, max_pages_to_process)}] {'🔍' if used_ocr else '📝'} {nchar}ch")
+        if page_i % 5 == 0 or used_ocr:  # Her 5 sayfada bir log
+            print(f"📄 [{page_i}/{total}] {'🔍' if used_ocr else '📝'} {nchar}ch")
 
     parts = []
     total_chars = 0
@@ -188,23 +188,20 @@ def extract_pdf_full_text(pdf_path: Path, prefer_speed: bool = True) -> str:
         total_chars += len(chunk)
         page_count += 1
         
-        # Sayfa limiti kontrolü
-        if page_count >= max_pages_to_process:
-            parts.append(f"\n\n[⚡ Hız için {max_pages_to_process} sayfada duruldu.]")
-            break
-            
-        # Memory protection - daha agresif
-        if total_chars > MAX_TEXT_LENGTH:
-            parts.append(f"\n\n[⚡ Hız için içerik kısaltıldı.]")
+        # Sayfa limiti kontrolü kaldırıldı - tüm sayfalar işlenecek
+        
+        # Memory protection - daha büyük limit
+        if total_chars > MAX_TEXT_LENGTH * 3:  # 90000 karakter limiti
+            parts.append(f"\n\n[📄 Çok büyük dosya - içerik kısaltıldı.]")
             break
 
     body = "\n".join(parts).strip()
     
-    # Final truncation - daha kısa
-    if len(body) > MAX_TEXT_LENGTH:
-        body = body[:MAX_TEXT_LENGTH] + "\n\n[⚡ Hız için kısaltıldı.]"
+    # Final truncation - daha büyük limit
+    if len(body) > MAX_TEXT_LENGTH * 3:  # 90000 karakter
+        body = body[:MAX_TEXT_LENGTH * 3] + "\n\n[📄 Çok büyük dosya - kısaltıldı.]"
     
-    header = f"⚡ {pdf_path.name} - Hızlı Analiz"
+    header = f"📄 {pdf_path.name} - Tam Analiz"
     if used_any_ocr["flag"]:
         header += " [🔍 OCR]"
     header += f" ({processed_pages['count']} sayfa)"
