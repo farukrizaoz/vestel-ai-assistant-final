@@ -35,6 +35,8 @@ const sessionList = document.getElementById('session-list');
 const currentSessionName = currentSessionDisplay;
 const sidebarContainer = document.getElementById('session-sidebar-container');
 const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+const sessionInfoContainer = document.getElementById('session-info-container');
+const chatColumn = document.getElementById('chat-column');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', function() {
@@ -119,9 +121,17 @@ function setupEventListeners() {
         });
     });
 
-    if (toggleSidebarBtn && sidebarContainer) {
+    if (toggleSidebarBtn && sidebarContainer && sessionInfoContainer && chatColumn) {
         toggleSidebarBtn.addEventListener('click', () => {
-            sidebarContainer.classList.toggle('d-none');
+            const hidden = sidebarContainer.classList.toggle('d-none');
+            sessionInfoContainer.classList.toggle('d-none', hidden);
+            if (hidden) {
+                chatColumn.classList.remove('col-lg-8', 'col-md-6');
+                chatColumn.classList.add('col-12');
+            } else {
+                chatColumn.classList.remove('col-12');
+                chatColumn.classList.add('col-lg-8', 'col-md-6');
+            }
         });
     }
 }
