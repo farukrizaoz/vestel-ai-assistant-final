@@ -2,9 +2,16 @@
 Technical Support Agent - Teknik destek uzmanı
 """
 
-from crewai import Agent
-from agent_system.config import GOOGLE_API_KEY, llm
+from crewai import Agent, LLM
+from agent_system.config import GOOGLE_API_KEY
 from agent_system.tools import PDFAnalysisTool
+
+# LLM instance
+llm = LLM(
+    model="gemini/gemini-2.5-flash",
+    api_key=GOOGLE_API_KEY,
+    temperature=0.2
+)
 
 def create_technical_support_agent():
     """Teknik destek uzmanı agent"""

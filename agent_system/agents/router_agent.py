@@ -2,8 +2,15 @@
 Pure Router Agent - Sadece yönlendirme yapar
 """
 
-from crewai import Agent
-from agent_system.config import GOOGLE_API_KEY, llm
+from crewai import Agent, LLM
+from agent_system.config import GOOGLE_API_KEY
+
+# LLM instance
+llm = LLM(
+    model="gemini/gemini-2.5-flash",
+    api_key=GOOGLE_API_KEY,
+    temperature=0.0
+)
 
 def create_router_agent():
     """Güvenlik kontrolü yapan ve routing yapan agent"""

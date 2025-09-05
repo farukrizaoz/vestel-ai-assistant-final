@@ -2,9 +2,16 @@
 Product Search Agent - Ürün arama ve öneri uzmanı
 """
 
-from crewai import Agent
-from agent_system.config import GOOGLE_API_KEY, llm
+from crewai import Agent, LLM
+from agent_system.config import GOOGLE_API_KEY
 from agent_system.tools import ImprovedProductSearchTool, VestelCategorySearchTool, VestelPriceStockTool
+
+# LLM instance
+llm = LLM(
+    model="gemini/gemini-2.5-flash",
+    api_key=GOOGLE_API_KEY,
+    temperature=0.1
+)
 
 def create_product_search_agent():
     """Ürün arama uzmanı agent"""

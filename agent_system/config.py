@@ -29,15 +29,7 @@ print("📂 Paths configured")
 # --- LLM Ayarları ---
 GEMINI_MODEL = "gemini/gemini-2.5-flash"
 
-# CrewAI LLM instance - tüm agent'ler için ortak
-from crewai import LLM
-llm = LLM(
-    model="gemini/gemini-2.5-flash",
-    api_key=GOOGLE_API_KEY,
-    temperature=0.0
-)
-
-# LangChain versiyonu da mevcut (ihtiyaç halinde)
+# LangChain versiyonu (ihtiyaç halinde)
 from langchain_google_genai import ChatGoogleGenerativeAI
 langchain_llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GOOGLE_API_KEY, temperature=0.0)
 

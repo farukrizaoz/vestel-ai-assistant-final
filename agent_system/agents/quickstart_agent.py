@@ -2,9 +2,16 @@
 Quickstart Agent - İlk kurulum ve hızlı başlangıç uzmanı
 """
 
-from crewai import Agent
-from agent_system.config import GOOGLE_API_KEY, llm
+from crewai import Agent, LLM
+from agent_system.config import GOOGLE_API_KEY
 from agent_system.tools import PDFAnalysisTool
+
+# LLM instance
+llm = LLM(
+    model="gemini/gemini-2.5-flash",
+    api_key=GOOGLE_API_KEY,
+    temperature=0.0  # Deterministik sonuçlar için
+)
 
 def create_quickstart_agent():
     """İlk kurulum ve genel bilgi uzmanı agent'i oluşturur"""
