@@ -9,6 +9,7 @@ from typing import Dict, List
 
 from agent_system.config import PROJECT_ROOT
 from agent_system.session_db import session_db
+from agent_system.constants import GREETING_MESSAGE
 
 # Session dosyaları için klasör
 SESSIONS_DIR = Path(PROJECT_ROOT) / "sessions"
@@ -85,10 +86,13 @@ class ConversationManager:
         self.conversation_history = []
         self.current_products = []
         self.save_session()
-        
+
         # DB'ye kaydet
         session_db.create_session(self.session_id)
-        
+
+        # İlk karşılama mesajını ekle
+        self.add_message(self.session_id, 'assistant', GREETING_MESSAGE)
+
         return self.session_id
     
     def add_message(self, session_id: str, sender: str, content: str):
