@@ -327,6 +327,12 @@ function startNewChat() {
                 initializeChat();
                 updateSessionDisplay();
 
+                const welcome = document.getElementById('welcome-message');
+                if (welcome) welcome.remove();
+                if (data.greeting) {
+                    addMessage('assistant', data.greeting);
+                }
+
                 // Update URL
                 const newUrl = new URL(window.location);
                 newUrl.searchParams.set('session', data.session_id);
@@ -353,6 +359,12 @@ function newSession() {
                 initializeChat();
                 loadSessionList();
                 updateSessionDisplay();
+
+                const welcome = document.getElementById('welcome-message');
+                if (welcome) welcome.remove();
+                if (data.greeting) {
+                    addMessage('assistant', data.greeting);
+                }
             } else {
                 alert('Yeni session oluşturulamadı: ' + data.error);
             }

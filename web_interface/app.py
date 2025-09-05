@@ -11,6 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
 from agent_system.main import VestelAgentSystem
 from agent_system.state_manager import get_conversation_manager, hydrate_sessions_from_disk
+from agent_system.constants import GREETING_MESSAGE
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'vestel-agent-secret-key-2025'
@@ -129,11 +130,11 @@ def new_chat_session():
     try:
         session_manager = get_conversation_manager()
         session_id = session_manager.create_session()
-        
+
         return jsonify({
             'success': True,
             'session_id': session_id,
-            'message': 'Yeni chat session başlatıldı'
+            'greeting': GREETING_MESSAGE
         })
     except Exception as e:
         return jsonify({
@@ -169,12 +170,19 @@ def handle_message(data):
             'message_id': message_id,
             'status': 'received'
         })
-        
+
         if not session_id:
             # Yeni session oluştur
             temp_manager = get_conversation_manager()
             session_id = temp_manager.create_session()
             emit('new_session', {'session_id': session_id})
+            emit('message_response', {
+                'message': GREETING_MESSAGE,
+                'session_id': session_id,
+                'timestamp': datetime.now().strftime('%H:%M:%S'),
+                'message_id': str(uuid.uuid4()),
+                'thinking_id': None
+            })
             print(f"🆕 Yeni session oluşturuldu: {session_id}")
         
         # Session-specific manager al
