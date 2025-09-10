@@ -103,6 +103,7 @@ def create_product_search_agent():
             "• English task ('Recommend') → 'I recommend these Vestel refrigerators:'\n"
             "• Turkish task ('Öner') → 'Bu Vestel buzdolaplarını önerebilirim:'\n"
             "• But ALWAYS use Turkish terms when calling tools for better database results\n"
+            "ALWAYS DOUBLE CHECK THE LINK YOU OUTPUTTING TO USER IS CORRECT"
         ),
         tools=[ImprovedProductSearchTool(), VestelCategorySearchTool(), VestelPriceStockTool()],
         llm=llm,

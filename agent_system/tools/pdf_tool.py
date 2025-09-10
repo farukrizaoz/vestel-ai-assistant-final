@@ -89,24 +89,23 @@ def ocr_single_page(pdf_path: Path, page_no_1based: int, dpi: int = 140, lang: s
 
 def page_text_hybrid(reader: PyPDF2.PdfReader, pdf_path: Path, idx: int,
                      ocr_if_needed: bool = True,
-                     ocr_dpi: int = 120,  # Düşük DPI
-                     min_len_for_ok: int = 150) -> Tuple[str, bool]:  # Düşük threshold
+                     ocr_dpi: int = 120,
+                     min_len_for_ok: int = 150) -> Tuple[str, bool]:  # Lower threshold
     """
-    Tek sayfa: önce PyPDF2, yetmezse OCR. (text, ocr_used)
+    Single page: try PyPDF2 first, if not enough, use OCR. Returns (text, ocr_used)
     """
-    # 0-based -> 1-based
     p1 = idx + 1
     t = extract_text_pypdf2_page(reader, idx)
     if is_text_meaningful(t, min_len=min_len_for_ok):
         return (t, False)
 
-    # OCR'a daha az başvur - sadece gerçekten boşsa
-    if ocr_if_needed and OCR_AVAILABLE and len(t.strip()) < 50:  # Çok boşsa OCR yap
+    # minimize unnecessary OCR usage
+    if ocr_if_needed and OCR_AVAILABLE and len(t.strip()) < 50:  # If very empty, use OCR
         t2 = ocr_single_page(pdf_path, p1, dpi=ocr_dpi)
-        if t2 and len(t2.strip()) > 30:  # OCR'dan az bile olsa bir şey gelirse kullan
+        if t2 and len(t2.strip()) > 30:  # If OCR returns even a little, use it
             return (t2, True)
 
-    # pypdf2 metni azsa da döndür (boş kalmasın)
+    # If PyPDF2 text is little still return it 
     return (t, False)
 
 def iter_pdf_text_stream(pdf_path: Path,
