@@ -1,5 +1,5 @@
 """
-Pure Router Agent - Sadece yönlendirme yapar
+Pure Router Agent - Only performs routing
 """
 
 from crewai import Agent, LLM
@@ -13,10 +13,10 @@ llm = LLM(
 )
 
 def create_router_agent():
-    """Güvenlik kontrolü yapan ve routing yapan agent"""
+    """Agent that performs security checks and routing"""
     return Agent(
-        role="Vestel AI Assistant Güvenlik ve Yönlendirme Uzmanı",
-        goal="Kullanıcı isteğini güvenlik kontrolünden geçirip doğru uzman agente yönlendir",
+        role="Vestel AI Assistant Security and Routing Expert",
+        goal="Pass the user's request through a security check and route it to the correct expert agent",
         backstory=(
             "You are the main coordinator and security expert of Vestel AI Assistant.\n\n"
             
@@ -73,9 +73,9 @@ def create_router_agent():
             "• Turkish user request → Turkish task delegation\n"
             "• Customer service: 0 850 222 4 123"
         ),
-        tools=[],  # Router'da tool yok, sadece analiz
+        tools=[],  # No tools in router, only analysis
         llm=llm,
-        verbose=False,  # Internal reasoning'i gizle
+        verbose=False,  # Hide internal reasoning
         allow_delegation=True,
-        max_iter=5  # LLM hataları için daha fazla retry
+        max_iter=5  # More retries for LLM errors
     )

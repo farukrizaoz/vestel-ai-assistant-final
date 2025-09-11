@@ -35,7 +35,7 @@ class VestelProductSearchTool(BaseTool):
             if not search_terms:
                 return f"'{query}' için geçerli arama terimi bulunamadı."
             
-            # Her kelime için LIKE koşulu oluştur
+            # Create LIKE condition for each word
             conditions = []
             params = []
             
@@ -49,7 +49,7 @@ class VestelProductSearchTool(BaseTool):
                 """)
                 params.extend([term_pattern, term_pattern, term_pattern, term_pattern])
             
-            # Tüm kelimelerin bulunduğu ürünleri ara (AND mantığı)
+            # Search for products containing all keywords
             sql = f"""
             SELECT model_number, name, manual_keywords, manual_desc, url
             FROM products 
@@ -60,10 +60,12 @@ class VestelProductSearchTool(BaseTool):
             cursor.execute(sql, params)
             results = cursor.fetchall()
             
-            # Eğer tüm kelimelerle bulamazsa, en az yarısını içeren ürünleri ara
+            # If no results are found with all keywords, search for products containing at least half of them
             if not results and len(search_terms) > 1:
                 half_conditions = conditions[:max(1, len(conditions)//2)]
-                half_params = params[:len(half_conditions)*4]
+                # Each condition uses 4 parameters (name, model_number, manual_keywords, manual_desc)
+                params_per_condition = 4
+                half_params = params[:len(half_conditions) * params_per_condition]
                 
                 sql = f"""
                 SELECT model_number, name, manual_keywords, manual_desc, url

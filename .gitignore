@@ -29,9 +29,9 @@ env/
 # Environment variables
 .env
 
-# Database files (sensitive data)
-*.db
-vestel_products.db
+# Database files - now included for deployment
+# *.db
+# vestel_products.db  
 vestel_sessions.db
 
 # Sessions
